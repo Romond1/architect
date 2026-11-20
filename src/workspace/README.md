@@ -69,3 +69,14 @@ bridge.requestDelivery({
 });
 ```
 This opens the studio's **Deliver Design** dialog pre-filled with your screenshot, project name, cost calculation, and data.
+
+## Lifecycle and save rules for lesson tools
+
+- The workspace remains mounted while other studio tabs are visible. Save meaningful changes anyway: React state alone does not survive a page reload.
+- The bridge remains stable during status reports. Its identity can change when commission context, theme, reduced motion, or fullscreen changes. Publish status from an effect or action, never during render. Identical reports are ignored; partial reports merge with the current status.
+- `storage.save`, `remove`, `clear`, and `importAll` can throw if browser storage is unavailable or full. Show the error and keep the student's unsaved state in memory. `load` returns `null` for a missing record and throws for an unreadable existing record, leaving its bytes untouched.
+- Store plain JSON objects, arrays, strings, booleans, null, and finite numbers. Give your own project format a version. Do not store functions, DOM nodes, renderer objects, cycles, or binary objects directly.
+- Both providers should return the current project data, not an outdated closure. Use effect cleanup to unregister them. Project data and itemized costs are copied when delivery opens; subsequent edits do not mutate captured evidence.
+- If changing React state and delivering within the same action, pass the newly computed data explicitly to `requestDelivery`. Providers based on React state see the state of their current render.
+- Import/reset remounts `ArchitectureWorkspace` and clears previous providers/status. Read `bridge.storage.load` in your initialization to load the restored project. A framework-only backup does not replace workspace records.
+- None of these hooks can approve a commission or pay coins. Teacher review remains authoritative.

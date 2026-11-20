@@ -26,10 +26,14 @@ function safeLocalSet(id: string, dataUrl: string): void {
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(`${LOCAL_FALLBACK_PREFIX}${id}`, dataUrl);
+      return;
     }
   } catch {
-    // Ignore storage quota errors in fallback
+    throw new Error(
+      'Design image could not be saved: browser storage is full or unavailable. Keep the image and export a backup before trying again.'
+    );
   }
+  throw new Error('Design image storage is unavailable.');
 }
 
 function safeLocalGet(id: string): string | null {
@@ -44,9 +48,9 @@ function safeLocalGet(id: string): string | null {
 }
 
 export async function saveArtifact(id: string, dataUrl: string): Promise<void> {
-  memoryArtifacts.set(id, dataUrl);
   if (!hasIndexedDb()) {
     safeLocalSet(id, dataUrl);
+    memoryArtifacts.set(id, dataUrl);
     return;
   }
   try {
@@ -61,6 +65,7 @@ export async function saveArtifact(id: string, dataUrl: string): Promise<void> {
   } catch {
     safeLocalSet(id, dataUrl);
   }
+  memoryArtifacts.set(id, dataUrl);
 }
 
 export async function getArtifact(id: string): Promise<string | null> {
@@ -149,7 +154,10 @@ export async function getAllArtifacts(): Promise<Record<string, string>> {
       cursorReq.onsuccess = () => {
         const cursor = cursorReq.result;
         if (cursor) {
-          if (typeof cursor.key === 'string' && typeof cursor.value === 'string') {
+          if (
+            typeof cursor.key === 'string' &&
+            typeof cursor.value === 'string'
+          ) {
             map[cursor.key] = cursor.value;
             memoryArtifacts.set(cursor.key, cursor.value);
           }
@@ -206,7 +214,8 @@ export function readFileAsDataUrl(file: File): Promise<string> {
         reject(new Error('Could not read file as data URL.'));
       }
     };
-    reader.onerror = () => reject(reader.error ?? new Error('File read failed.'));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error('File read failed.'));
     reader.readAsDataURL(file);
   });
 }
@@ -242,7 +251,10 @@ export async function processImageFileToDataUrl(
         finish(rawUrl);
         return;
       }
-      const scale = Math.min(maxDimension / img.width, maxDimension / img.height);
+      const scale = Math.min(
+        maxDimension / img.width,
+        maxDimension / img.height
+      );
       const width = Math.max(1, Math.round(img.width * scale));
       const height = Math.max(1, Math.round(img.height * scale));
       const canvas = document.createElement('canvas');

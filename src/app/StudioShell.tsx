@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import { AchievementsView } from '../components/AchievementsView';
 import { CelebrationModal } from '../components/CelebrationModal';
 import { CommissionsModal } from '../components/CommissionsModal';
@@ -13,6 +20,7 @@ import { WorkspaceHost } from '../components/WorkspaceHost';
 import {
   getReadyToAcceptCommission,
   getSortedCommissions,
+  createInitialFrameworkState,
 } from '../framework/commissions/commissionService';
 import { getCustomerProfile } from '../framework/customers/customerState';
 import {
@@ -22,11 +30,16 @@ import {
   saveArtifact,
 } from '../framework/persistence/artifactStore';
 import {
-  clearFrameworkState,
   loadFrameworkState,
   saveFrameworkState,
 } from '../framework/persistence/frameworkStorage';
-import { createWorkspaceStorageApi } from '../framework/persistence/workspaceStorage';
+import {
+  createWorkspaceStorageApi,
+  replaceWorkspaceData,
+} from '../framework/persistence/workspaceStorage';
+import { cloneSerializable } from '../framework/utils/serializable';
+import { restoreStudioBackup } from '../framework/persistence/restoreService';
+import { listPortfolioSnapshots } from '../framework/portfolio/portfolioService';
 import { getArchitectRank } from '../framework/rewards/achievementService';
 import {
   getActiveStudioTheme,
@@ -64,18 +77,29 @@ export function StudioShell() {
     studioReducer,
     initialLoadRef.current.state
   );
+  const persistenceBlockedRef = useRef(
+    Boolean(initialLoadRef.current.writeBlocked)
+  );
   const [corruptedBanner, setCorruptedBanner] = useState<string | null>(
     initialLoadRef.current.corruptedRecovered
-      ? initialLoadRef.current.errorMessage ??
-          'Previous studio save appeared corrupted and was safely backed up.'
+      ? (initialLoadRef.current.errorMessage ??
+          'Previous studio save appeared corrupted and was safely backed up.')
       : null
   );
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('studio');
   const [artifacts, setArtifacts] = useState<Record<string, string>>({});
   const [workspaceFullscreen, setWorkspaceFullscreen] = useState(false);
+  const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [deliveryError, setDeliveryError] = useState<string | null>(null);
+  const deliverySequence = useRef(0);
+  const activeCommissionIdRef = useRef(state.activeCommissionId);
+  activeCommissionIdRef.current = state.activeCommissionId;
   const [workspaceStatus, setWorkspaceStatus] =
     useState<WorkspaceDeliverableStatus>(EMPTY_WORKSPACE_STATUS);
+  const workspaceStatusRef = useRef(workspaceStatus);
+  workspaceStatusRef.current = workspaceStatus;
 
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [deliveryDraft, setDeliveryDraft] =
@@ -95,10 +119,7 @@ export function StudioShell() {
   const earnedCount = Object.keys(state.earnedAchievements).length;
   const architectRank = getArchitectRank(earnedCount);
 
-  const sortedCommissions = useMemo(
-    () => getSortedCommissions(state),
-    [state]
-  );
+  const sortedCommissions = useMemo(() => getSortedCommissions(state), [state]);
   const completedCount = useMemo(
     () =>
       Object.values(state.commissionProgress).filter(
@@ -132,11 +153,19 @@ export function StudioShell() {
       String(state.preferences.reducedMotion)
     );
     document.title = state.preferences.studioTitle;
-  }, [activeTheme, state.preferences.reducedMotion, state.preferences.studioTitle]);
+  }, [
+    activeTheme,
+    state.preferences.reducedMotion,
+    state.preferences.studioTitle,
+  ]);
 
   // Persist framework state cleanly on every state change
   useEffect(() => {
-    saveFrameworkState(state);
+    setSaveError(
+      !persistenceBlockedRef.current && saveFrameworkState(state)
+        ? null
+        : 'Your progress could not be saved on this computer. Keep this page open and export a full backup in Teacher controls before closing it.'
+    );
   }, [state]);
 
   // Hydrate referenced artifact images from IndexedDB / local fallback
@@ -147,7 +176,7 @@ export function StudioShell() {
         neededIds.push(sub.imageArtifactId);
       }
     }
-    for (const entry of state.portfolio) {
+    for (const entry of listPortfolioSnapshots(state.portfolio)) {
       if (entry.imageArtifactId) {
         neededIds.push(entry.imageArtifactId);
       }
@@ -185,48 +214,65 @@ export function StudioShell() {
 
   const openDeliveryDialogWithDraft = useCallback(
     async (explicitDraft?: WorkspaceDeliveryDraft) => {
+      const sequence = ++deliverySequence.current;
+      const commissionId = activeCommissionIdRef.current;
+      setDeliveryError(null);
       let draft: WorkspaceDeliveryDraft = {
         projectTitle:
           explicitDraft?.projectTitle ??
-          workspaceStatus.projectName ??
+          workspaceStatusRef.current.projectName ??
           undefined,
         notes: explicitDraft?.notes,
         reportedCost:
           explicitDraft?.reportedCost !== undefined
             ? explicitDraft.reportedCost
-            : workspaceStatus.estimatedCost,
+            : workspaceStatusRef.current.estimatedCost,
         itemizedCosts:
-          explicitDraft?.itemizedCosts ?? workspaceStatus.itemizedCosts,
-        artifact: explicitDraft?.artifact ?? null,
+          explicitDraft?.itemizedCosts ??
+          workspaceStatusRef.current.itemizedCosts,
+        artifact: explicitDraft?.artifact
+          ? { ...explicitDraft.artifact }
+          : null,
         projectData: explicitDraft?.projectData,
       };
+      try {
+        if (draft.projectData === undefined && projectDataProviderRef.current)
+          draft.projectData = projectDataProviderRef.current() ?? undefined;
+        if (draft.projectData !== undefined)
+          draft.projectData = cloneSerializable(draft.projectData);
+        if (draft.itemizedCosts)
+          draft.itemizedCosts = cloneSerializable(draft.itemizedCosts);
+      } catch {
+        setDeliveryError(
+          'Project data could not be captured. Save plain JSON project data, then try Deliver Design again.'
+        );
+        return;
+      }
 
       if (!draft.artifact && snapshotProviderRef.current) {
         try {
           const snap = await snapshotProviderRef.current();
           if (snap) {
-            draft = { ...draft, artifact: snap };
+            draft = { ...draft, artifact: { ...snap } };
           }
         } catch {
           // Allow student to attach manually if snapshot fails
+          setDeliveryError(
+            'The workspace image could not be captured. Please attach a screenshot in the delivery form.'
+          );
         }
       }
 
-      if (draft.projectData === undefined && projectDataProviderRef.current) {
-        try {
-          draft = {
-            ...draft,
-            projectData: projectDataProviderRef.current() ?? undefined,
-          };
-        } catch {
-          // Ignore optional snapshot serialization error
-        }
-      }
+      if (
+        sequence !== deliverySequence.current ||
+        commissionId !== activeCommissionIdRef.current
+      )
+        return;
 
       setDeliveryDraft(draft);
       setDeliveryModalOpen(true);
     },
-    [workspaceStatus]
+    []
   );
 
   const toggleFullscreen = useCallback(() => {
@@ -252,10 +298,24 @@ export function StudioShell() {
       },
       storage: workspaceStorage,
       reportStatus: (partial) => {
-        setWorkspaceStatus((prev) => ({
-          ...prev,
-          ...partial,
-        }));
+        if (
+          partial.estimatedCost !== undefined &&
+          partial.estimatedCost !== null &&
+          (!Number.isFinite(partial.estimatedCost) || partial.estimatedCost < 0)
+        )
+          throw new Error(
+            'Estimated cost must be a finite, non-negative number.'
+          );
+        const patch = { ...partial };
+        if (patch.itemizedCosts)
+          patch.itemizedCosts = cloneSerializable(patch.itemizedCosts);
+        const next = { ...workspaceStatusRef.current, ...patch };
+        if (
+          JSON.stringify(workspaceStatusRef.current) !== JSON.stringify(next)
+        ) {
+          workspaceStatusRef.current = next;
+          setWorkspaceStatus(next);
+        }
       },
       registerSnapshotProvider: (provider) => {
         snapshotProviderRef.current = provider;
@@ -287,6 +347,10 @@ export function StudioShell() {
     projectData?: unknown;
     source: 'manual' | 'workspace';
   }) => {
+    const projectData =
+      payload.projectData === undefined
+        ? undefined
+        : cloneSerializable(payload.projectData);
     const artifactId = createUniqueId('art');
     await saveArtifact(artifactId, payload.imageDataUrl);
     setArtifacts((prev) => ({ ...prev, [artifactId]: payload.imageDataUrl }));
@@ -300,7 +364,7 @@ export function StudioShell() {
         reportedCost: payload.reportedCost,
         itemizedCosts: payload.itemizedCosts,
         imageArtifactId: artifactId,
-        projectData: payload.projectData,
+        projectData,
         source: payload.source,
       },
     });
@@ -382,16 +446,35 @@ export function StudioShell() {
           </button>
         </div>
       )}
+      {saveError && (
+        <div className={styles.recoveryBanner} role="alert">
+          <span>{saveError}</span>
+        </div>
+      )}
+      {deliveryError && (
+        <div className={styles.recoveryBanner} role="alert">
+          <span>{deliveryError}</span>
+          <button
+            className={styles.recoveryClose}
+            onClick={() => setDeliveryError(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
-      {activeTab === 'studio' && (
-        <div className={styles.studioMain}>
+      {
+        <div
+          className={styles.studioMain}
+          style={activeTab === 'studio' ? undefined : { display: 'none' }}
+        >
           <CustomerPanel
             commission={activeCommission}
             progress={activeProgress}
             submission={activeSubmission}
             submissionImageUrl={
               activeSubmission
-                ? artifacts[activeSubmission.imageArtifactId] ?? null
+                ? (artifacts[activeSubmission.imageArtifactId] ?? null)
                 : null
             }
             latestFeedback={latestFeedback}
@@ -404,6 +487,7 @@ export function StudioShell() {
           />
 
           <WorkspaceHost
+            key={workspaceEpoch}
             bridge={workspaceBridge}
             workspaceStatus={workspaceStatus}
             isFullscreen={workspaceFullscreen}
@@ -411,7 +495,7 @@ export function StudioShell() {
             onOpenDelivery={() => void openDeliveryDialogWithDraft()}
           />
         </div>
-      )}
+      }
 
       {activeTab === 'portfolio' && (
         <PortfolioView
@@ -567,28 +651,53 @@ export function StudioShell() {
           }}
           onExportWorkspaceData={() => workspaceStorage.exportAll()}
           onImportBackup={async (backup, importWorkspace) => {
-            for (const [id, dataUrl] of Object.entries(backup.artifacts)) {
-              await saveArtifact(id, dataUrl);
-            }
-            setArtifacts((prev) => ({ ...prev, ...backup.artifacts }));
-            if (importWorkspace && backup.workspaceData) {
-              workspaceStorage.clear();
-              workspaceStorage.importAll(backup.workspaceData);
-            }
+            deliverySequence.current++;
+            setDeliveryModalOpen(false);
+            const restored = await restoreStudioBackup(
+              backup,
+              workspaceStorage,
+              importWorkspace
+            );
+            setArtifacts(restored.artifacts);
+            snapshotProviderRef.current = null;
+            projectDataProviderRef.current = null;
+            setWorkspaceStatus(EMPTY_WORKSPACE_STATUS);
+            setWorkspaceEpoch((epoch) => epoch + 1);
             dispatch({
               type: 'REPLACE_STATE',
-              payload: backup.frameworkState,
+              payload: restored.state,
             });
+            persistenceBlockedRef.current = false;
           }}
           onResetProgress={async (clearWorkspace) => {
-            clearFrameworkState();
-            await clearAllArtifacts();
-            setArtifacts({});
-            if (clearWorkspace) {
-              workspaceStorage.clear();
+            const fresh = createInitialFrameworkState();
+            const previousWorkspace = clearWorkspace
+              ? workspaceStorage.exportAll()
+              : undefined;
+            if (clearWorkspace) replaceWorkspaceData(workspaceStorage, {});
+            if (!saveFrameworkState(fresh)) {
+              if (previousWorkspace)
+                replaceWorkspaceData(workspaceStorage, previousWorkspace);
+              throw new Error(
+                'Progress could not be reset because browser storage is unavailable. Existing progress was retained.'
+              );
             }
+            deliverySequence.current++;
+            setDeliveryModalOpen(false);
+            persistenceBlockedRef.current = false;
+            setArtifacts({});
             setWorkspaceStatus(EMPTY_WORKSPACE_STATUS);
+            snapshotProviderRef.current = null;
+            projectDataProviderRef.current = null;
+            setWorkspaceEpoch((epoch) => epoch + 1);
             dispatch({ type: 'RESET_ALL' });
+            try {
+              await clearAllArtifacts();
+            } catch {
+              setDeliveryError(
+                'Progress was reset, but some unused images could not be removed from browser storage.'
+              );
+            }
           }}
           onClose={() => setTeacherPanelOpen(false)}
         />

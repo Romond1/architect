@@ -13,6 +13,7 @@ import type {
   SubmissionRecord,
 } from '../types';
 import { createUniqueId } from '../utils/id';
+import { cloneSerializable } from '../utils/serializable';
 
 export interface CreateSubmissionInput {
   commissionId: string;
@@ -50,7 +51,10 @@ export function createSubmission(
         : null,
     itemizedCosts: input.itemizedCosts?.map((item) => ({ ...item })),
     imageArtifactId: input.imageArtifactId,
-    projectData: input.projectData,
+    projectData:
+      input.projectData === undefined
+        ? undefined
+        : cloneSerializable(input.projectData),
     source: input.source,
     status: 'submitted',
   };
@@ -219,7 +223,8 @@ export function approveCommissionSubmission(
       ? input.feedbackMessage.trim()
       : commission.successDialogue;
   const expression: RabbitExpression =
-    input.expression ?? (commission.isGrandFinale ? 'extremelyHappy' : 'celebrating');
+    input.expression ??
+    (commission.isGrandFinale ? 'extremelyHappy' : 'celebrating');
 
   const feedbackId = createUniqueId('fb');
   const approvalFeedback: FeedbackRecord = {
@@ -298,17 +303,21 @@ export function approveCommissionSubmission(
     achievementTitle: achievementDef?.title,
   };
 
-  // Replace only if this commission was previously completed & reopened by teacher;
-  // earlier commissions' snapshots remain completely untouched.
+  // Show the teacher's latest approved revision without losing earlier snapshots.
   const existingEntryIdx = state.portfolio.findIndex(
     (entry) => entry.commissionId === commission.id
   );
   const nextPortfolio = [...state.portfolio];
   if (existingEntryIdx >= 0) {
-    const previousPaid = nextPortfolio[existingEntryIdx].paymentReceived;
+    const { previousApprovals = [], ...previous } =
+      nextPortfolio[existingEntryIdx];
     nextPortfolio[existingEntryIdx] = {
       ...portfolioEntry,
-      paymentReceived: Math.max(previousPaid, portfolioEntry.paymentReceived),
+      paymentReceived: Math.max(
+        previous.paymentReceived,
+        portfolioEntry.paymentReceived
+      ),
+      previousApprovals: [...previousApprovals, previous],
     };
   } else {
     nextPortfolio.push(portfolioEntry);
@@ -324,7 +333,8 @@ export function approveCommissionSubmission(
       unlockState: 'completed' as const,
       status: 'commission_completed' as const,
       paymentAwarded: true,
-      achievementAwarded: progress.achievementAwarded || Boolean(achievementDef),
+      achievementAwarded:
+        progress.achievementAwarded || Boolean(achievementDef),
       completedAt: progress.completedAt ?? now,
       latestFeedbackId: feedbackId,
     },

@@ -1,4 +1,10 @@
 import type { PortfolioEntry } from '../types';
+export function listPortfolioSnapshots(entries: PortfolioEntry[]) {
+  return entries.flatMap((entry) => [
+    ...(entry.previousApprovals ?? []),
+    entry,
+  ]);
+}
 
 function escapeHtml(text: string): string {
   return text
@@ -35,6 +41,10 @@ export function buildPortfolioJsonExport(
     entries: entries.map((entry) => ({
       ...entry,
       imageDataUrl: artifacts[entry.imageArtifactId] ?? null,
+      previousApprovals: entry.previousApprovals?.map((previous) => ({
+        ...previous,
+        imageDataUrl: artifacts[previous.imageArtifactId] ?? null,
+      })),
     })),
   };
   return JSON.stringify(payload, null, 2);

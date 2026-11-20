@@ -17,10 +17,7 @@ export type CommissionStatus =
   | 'commission_completed';
 
 export type CommissionUnlockState =
-  | 'locked'
-  | 'unlocked_pending_accept'
-  | 'active'
-  | 'completed';
+  'locked' | 'unlocked_pending_accept' | 'active' | 'completed';
 
 export interface CommissionRequirement {
   id: string;
@@ -106,6 +103,8 @@ export interface FeedbackRecord {
 }
 
 export interface PortfolioEntry {
+  /** Earlier explicitly approved versions, retained when a commission is reopened. */
+  previousApprovals?: Omit<PortfolioEntry, 'previousApprovals'>[];
   id: string;
   commissionId: string;
   commissionOrder: number;
@@ -127,9 +126,7 @@ export interface PortfolioEntry {
 }
 
 export type WalletTransactionType =
-  | 'commission_payment'
-  | 'shop_purchase'
-  | 'teacher_adjustment';
+  'commission_payment' | 'shop_purchase' | 'teacher_adjustment';
 
 export interface WalletTransaction {
   id: string;
@@ -178,10 +175,7 @@ export interface EarnedAchievement {
 export type StudioThemeId = 'default' | 'starry' | 'elegant';
 
 export type ShopItemCategory =
-  | 'customer_accessory'
-  | 'studio_decor'
-  | 'studio_trophy'
-  | 'studio_theme';
+  'customer_accessory' | 'studio_decor' | 'studio_trophy' | 'studio_theme';
 
 export type CosmeticSlot =
   | 'rabbit_neck'

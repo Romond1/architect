@@ -6,6 +6,7 @@ import type { FrameworkState } from '../types';
 import {
   type FrameworkStorageEnvelope,
   validateFrameworkEnvelope,
+  validateFrameworkState,
 } from './schema';
 
 export const FRAMEWORK_STORAGE_KEY = 'himari.studio.framework.v1';
@@ -15,6 +16,7 @@ export interface LoadFrameworkResult {
   state: FrameworkState;
   corruptedRecovered: boolean;
   errorMessage?: string;
+  writeBlocked?: boolean;
 }
 
 export function loadFrameworkState(
@@ -35,7 +37,10 @@ export function loadFrameworkState(
   } catch {
     return {
       state: createInitialFrameworkState(),
-      corruptedRecovered: false,
+      corruptedRecovered: true,
+      writeBlocked: true,
+      errorMessage:
+        'Saved progress could not be read from browser storage. It was left untouched; import a backup or explicitly reset before saving new progress.',
     };
   }
 
@@ -46,44 +51,30 @@ export function loadFrameworkState(
     };
   }
 
+  let problem = 'Saved studio data could not be parsed.';
   try {
-    const parsed: unknown = JSON.parse(raw);
-    const check = validateFrameworkEnvelope(parsed);
-    if (check.valid && check.state) {
-      return {
-        state: check.state,
-        corruptedRecovered: false,
-      };
-    }
-
-    // Quarantine malformed data instead of silently destroying it
-    try {
-      storage.setItem(`${CORRUPTED_QUARANTINE_PREFIX}${Date.now()}`, raw);
-      storage.removeItem(FRAMEWORK_STORAGE_KEY);
-    } catch {
-      // Ignore quarantine failure if storage is full
-    }
-    return {
-      state: createInitialFrameworkState(),
-      corruptedRecovered: true,
-      errorMessage:
-        check.error ??
-        'Saved studio data failed integrity validation and was backed up safely.',
-    };
+    const check = validateFrameworkEnvelope(JSON.parse(raw));
+    if (check.valid && check.state)
+      return { state: check.state, corruptedRecovered: false };
+    problem = check.error ?? 'Saved studio data failed validation.';
   } catch {
-    try {
-      storage.setItem(`${CORRUPTED_QUARANTINE_PREFIX}${Date.now()}`, raw);
-      storage.removeItem(FRAMEWORK_STORAGE_KEY);
-    } catch {
-      // Ignore
-    }
-    return {
-      state: createInitialFrameworkState(),
-      corruptedRecovered: true,
-      errorMessage:
-        'Saved studio data could not be parsed and was backed up before starting cleanly.',
-    };
+    /* Preserve the original bytes below. */
   }
+  let preserved = false;
+  try {
+    storage.setItem(`${CORRUPTED_QUARANTINE_PREFIX}${Date.now()}`, raw);
+    preserved = true;
+  } catch {
+    /* Never overwrite the only remaining copy when storage is full. */
+  }
+  return {
+    state: createInitialFrameworkState(),
+    corruptedRecovered: true,
+    writeBlocked: !preserved,
+    errorMessage: preserved
+      ? `${problem} The original save was preserved in recovery storage.`
+      : `${problem} Recovery storage is full. The original save is untouched; automatic saves are blocked until you import a backup or explicitly reset.`,
+  };
 }
 
 export function saveFrameworkState(
@@ -92,7 +83,7 @@ export function saveFrameworkState(
     ? localStorage
     : undefined
 ): boolean {
-  if (!storage) {
+  if (!storage || !validateFrameworkState(state).valid) {
     return false;
   }
   const envelope: FrameworkStorageEnvelope = {

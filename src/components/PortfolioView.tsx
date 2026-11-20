@@ -35,7 +35,9 @@ export function PortfolioView({
   architectRank,
   onBackToStudio,
 }: PortfolioViewProps) {
-  const [presentationIndex, setPresentationIndex] = useState<number | null>(null);
+  const [presentationIndex, setPresentationIndex] = useState<number | null>(
+    null
+  );
   const chronological = [...entries].sort(
     (a, b) => a.commissionOrder - b.commissionOrder
   );
@@ -118,8 +120,8 @@ export function PortfolioView({
           <BookOpen size={34} color="var(--accent-blueprint)" />
           <h3>Your portfolio awaits its very first project</h3>
           <p style={{ maxWidth: '46ch' }}>
-            When Mr. Rabbit and your teacher approve your first delivered design,
-            it will be preserved here as a permanent milestone.
+            When Mr. Rabbit and your teacher approve your first delivered
+            design, it will be preserved here as a permanent milestone.
           </p>
           <button
             type="button"
@@ -139,18 +141,32 @@ export function PortfolioView({
                 className={styles.card}
                 data-testid={`portfolio-entry-${entry.commissionOrder}`}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    alignItems: 'center',
+                  }}
+                >
                   <span className={styles.badge}>
                     Commission {entry.commissionOrder}
                   </span>
-                  <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                  <span
+                    style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}
+                  >
                     {new Date(entry.completedAt).toLocaleDateString()}
                   </span>
                 </div>
 
                 <div>
                   <h3 style={{ fontSize: '1.26rem' }}>{entry.projectTitle}</h3>
-                  <div style={{ fontSize: '0.96rem', color: 'var(--text-secondary)' }}>
+                  <div
+                    style={{
+                      fontSize: '0.96rem',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
                     {entry.commissionTitle} &bull; For {entry.customerName}
                   </div>
                 </div>
@@ -163,7 +179,12 @@ export function PortfolioView({
                       className={styles.previewImg}
                     />
                   ) : (
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+                    <span
+                      style={{
+                        color: 'var(--text-muted)',
+                        fontSize: '0.95rem',
+                      }}
+                    >
                       No image snapshot stored
                     </span>
                   )}
@@ -198,7 +219,12 @@ export function PortfolioView({
                 </ul>
 
                 {entry.studentNotes && (
-                  <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
+                  <p
+                    style={{
+                      fontSize: '0.95rem',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
                     <strong>Notes:</strong> {entry.studentNotes}
                   </p>
                 )}
@@ -206,6 +232,41 @@ export function PortfolioView({
                 <blockquote className={styles.quoteBox}>
                   &ldquo;{entry.customerFeedback}&rdquo;
                 </blockquote>
+                {entry.previousApprovals?.length ? (
+                  <details>
+                    <summary>
+                      Earlier approved versions (
+                      {entry.previousApprovals.length})
+                    </summary>
+                    {entry.previousApprovals.map((previous) => (
+                      <section key={previous.id}>
+                        <h4>{previous.projectTitle}</h4>
+                        <p>
+                          {new Date(previous.completedAt).toLocaleDateString()}{' '}
+                          · Cost:{' '}
+                          {previous.reportedCostSnapshot ?? 'Not reported'} /{' '}
+                          {previous.constructionBudgetSnapshot} coins
+                        </p>
+                        {artifacts[previous.imageArtifactId] && (
+                          <img
+                            className={styles.previewImg}
+                            src={artifacts[previous.imageArtifactId]}
+                            alt={previous.projectTitle}
+                          />
+                        )}
+                        <ul>
+                          {previous.requirementsSnapshot.map((req) => (
+                            <li key={req.id}>{req.text}</li>
+                          ))}
+                        </ul>
+                        <p>{previous.studentNotes}</p>
+                        <blockquote className={styles.quoteBox}>
+                          {previous.customerFeedback}
+                        </blockquote>
+                      </section>
+                    ))}
+                  </details>
+                ) : null}
 
                 <button
                   type="button"

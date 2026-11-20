@@ -212,6 +212,7 @@ describe('Framework Core Domain', () => {
     expect(state.activeCelebration?.paymentAlreadyAwarded).toBe(true);
     expect(state.portfolio).toHaveLength(1);
     expect(state.portfolio[0].projectTitle).toBe('Room Plan Improved');
+    expect(state.portfolio[0].previousApprovals?.[0].projectTitle).toBe('Room Plan');
   });
 
   it('progresses sequentially across all 5 commissions to 2,000 coins and Master Architect', () => {

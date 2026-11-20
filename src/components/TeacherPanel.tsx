@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2,
   Coins,
@@ -50,7 +50,10 @@ interface TeacherPanelProps {
     unmetRequirementIds?: string[];
     isCustom?: boolean;
   }) => void;
-  onUnlockCommission: (commissionId: string, activateImmediately?: boolean) => void;
+  onUnlockCommission: (
+    commissionId: string,
+    activateImmediately?: boolean
+  ) => void;
   onReopenCommission: (commissionId: string) => void;
   onSwitchCommission: (commissionId: string) => void;
   onUpdateCommission: (
@@ -109,6 +112,27 @@ export function TeacherPanel({
   onClose,
 }: TeacherPanelProps) {
   const [activeTab, setActiveTab] = useState<TeacherTab>('review');
+  const [operationError, setOperationError] = useState<string | null>(null);
+  const [operationBusy, setOperationBusy] = useState(false);
+  const operationRef = useRef(false);
+  const perform = async (operation: () => Promise<void>) => {
+    if (operationRef.current) return;
+    operationRef.current = true;
+    setOperationBusy(true);
+    setOperationError(null);
+    try {
+      await operation();
+    } catch (error) {
+      setOperationError(
+        error instanceof Error
+          ? error.message
+          : 'This operation could not be completed. Existing progress was retained.'
+      );
+    } finally {
+      operationRef.current = false;
+      setOperationBusy(false);
+    }
+  };
 
   // Review tab state
   const sortedCommissions = useMemo(
@@ -177,13 +201,14 @@ export function TeacherPanel({
     state.preferences.studioTitle
   );
   const [walletDelta, setWalletDelta] = useState('50');
-  const [walletReason, setWalletReason] = useState('Bonus for thoughtful design');
+  const [walletReason, setWalletReason] = useState(
+    'Bonus for thoughtful design'
+  );
   const [walletNotice, setWalletNotice] = useState<string | null>(null);
 
   // Backup & Reset tab
-  const [importPreview, setImportPreview] = useState<ParsedBackupPreview | null>(
-    null
-  );
+  const [importPreview, setImportPreview] =
+    useState<ParsedBackupPreview | null>(null);
   const [importWorkspaceToggle, setImportWorkspaceToggle] = useState(true);
   const [backupNotice, setBackupNotice] = useState<string | null>(null);
   const [resetPhrase, setResetPhrase] = useState('');
@@ -213,7 +238,9 @@ export function TeacherPanel({
       .map((line) => line.trim())
       .filter(Boolean)
       .map((text, index) => ({
-        id: editCommission.requirements[index]?.id ?? `${editCommission.id}-req-${index + 1}`,
+        id:
+          editCommission.requirements[index]?.id ??
+          `${editCommission.id}-req-${index + 1}`,
         text,
       }));
 
@@ -231,7 +258,9 @@ export function TeacherPanel({
           };
         }
         return {
-          id: editCommission.dimensions[index]?.id ?? `${editCommission.id}-dim-${index + 1}`,
+          id:
+            editCommission.dimensions[index]?.id ??
+            `${editCommission.id}-dim-${index + 1}`,
           label: line.slice(0, colonIdx).trim(),
           value: line.slice(colonIdx + 1).trim(),
         };
@@ -271,7 +300,7 @@ export function TeacherPanel({
       feedbackMessage: message,
       expression: reviewCommission.isGrandFinale
         ? 'extremelyHappy'
-        : tpl?.expression ?? 'celebrating',
+        : (tpl?.expression ?? 'celebrating'),
       isCustomFeedback: trimmedCustom.length > 0,
     });
     setCustomApprovalMessage('');
@@ -290,8 +319,8 @@ export function TeacherPanel({
     const message =
       trimmedCustom.length > 0
         ? trimmedCustom
-        : tpl?.message ??
-          "Let's refine a couple of details together before finalizing!";
+        : (tpl?.message ??
+          "Let's refine a couple of details together before finalizing!");
 
     onRequestRevision({
       commissionId: reviewCommission.id,
@@ -343,7 +372,9 @@ export function TeacherPanel({
       <div className={`${modalStyles.dialog} ${modalStyles.dialogWide}`}>
         <div className={modalStyles.dialogHeader}>
           <div>
-            <span className={modalStyles.dialogEyebrow}>Educator Control Center</span>
+            <span className={modalStyles.dialogEyebrow}>
+              Educator Control Center
+            </span>
             <h2 id="teacher-panel-title" className={modalStyles.dialogTitle}>
               Teacher Controls &amp; Commission Desk
             </h2>
@@ -402,11 +433,21 @@ export function TeacherPanel({
         </div>
 
         <div className={modalStyles.dialogBody}>
+          {operationError && (
+            <p role="alert" style={{ color: 'var(--status-danger)' }}>
+              {operationError}
+            </p>
+          )}
           {/* TAB 1: REVIEW SUBMISSIONS */}
           {activeTab === 'review' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+            >
               <div className={modalStyles.fieldGroup}>
-                <label htmlFor="review-commission-select" className={modalStyles.fieldLabel}>
+                <label
+                  htmlFor="review-commission-select"
+                  className={modalStyles.fieldLabel}
+                >
                   Select Commission to Inspect
                 </label>
                 <select
@@ -434,18 +475,32 @@ export function TeacherPanel({
                 <div className={styles.sectionBox}>
                   <p style={{ color: 'var(--text-secondary)' }}>
                     No submission has been sent yet for{' '}
-                    <strong>{reviewCommission.title}</strong>. Once Himari delivers
-                    her design from the studio, it will appear right here for
-                    joint inspection.
+                    <strong>{reviewCommission.title}</strong>. Once Himari
+                    delivers her design from the studio, it will appear right
+                    here for joint inspection.
                   </p>
                 </div>
               ) : (
                 <div className={styles.splitGrid}>
                   {/* Submission Artifact Inspector */}
                   <div className={styles.sectionBox}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <h3 className={styles.sectionTitle}>{activeSub.projectTitle}</h3>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-blueprint)' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <h3 className={styles.sectionTitle}>
+                        {activeSub.projectTitle}
+                      </h3>
+                      <span
+                        style={{
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          color: 'var(--accent-blueprint)',
+                        }}
+                      >
                         {STATUS_LABELS[reviewProgress.status]}
                       </span>
                     </div>
@@ -465,7 +520,14 @@ export function TeacherPanel({
                       />
                     )}
 
-                    <div style={{ fontSize: '0.86rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div
+                      style={{
+                        fontSize: '0.86rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                      }}
+                    >
                       <div>
                         <strong>Reported Cost:</strong>{' '}
                         {activeSub.reportedCost !== null
@@ -499,7 +561,10 @@ export function TeacherPanel({
 
                     {/* Approval section */}
                     <div className={modalStyles.fieldGroup}>
-                      <label htmlFor="approval-template" className={modalStyles.fieldLabel}>
+                      <label
+                        htmlFor="approval-template"
+                        className={modalStyles.fieldLabel}
+                      >
                         Approval Response
                       </label>
                       <select
@@ -508,18 +573,22 @@ export function TeacherPanel({
                         value={approvalTemplateId}
                         onChange={(e) => setApprovalTemplateId(e.target.value)}
                       >
-                        {MR_RABBIT_CUSTOMER.scriptedApprovalTemplates.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.label}
-                          </option>
-                        ))}
+                        {MR_RABBIT_CUSTOMER.scriptedApprovalTemplates.map(
+                          (t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.label}
+                            </option>
+                          )
+                        )}
                       </select>
                       <textarea
                         rows={2}
                         className={modalStyles.textarea}
                         placeholder="Optional custom approval note from Mr. Rabbit..."
                         value={customApprovalMessage}
-                        onChange={(e) => setCustomApprovalMessage(e.target.value)}
+                        onChange={(e) =>
+                          setCustomApprovalMessage(e.target.value)
+                        }
                       />
                       <button
                         type="button"
@@ -536,14 +605,25 @@ export function TeacherPanel({
                       </button>
                     </div>
 
-                    <hr style={{ border: 'none', borderTop: '1px dashed var(--border-warm)' }} />
+                    <hr
+                      style={{
+                        border: 'none',
+                        borderTop: '1px dashed var(--border-warm)',
+                      }}
+                    />
 
                     {/* Constructive Revision section */}
                     <div className={modalStyles.fieldGroup}>
                       <span className={modalStyles.fieldLabel}>
                         Or Request Constructive Revision
                       </span>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '5px',
+                        }}
+                      >
                         {reviewCommission.requirements.map((req) => (
                           <label key={req.id} className={styles.reqCheckboxRow}>
                             <input
@@ -570,11 +650,13 @@ export function TeacherPanel({
                         value={revisionTemplateId}
                         onChange={(e) => setRevisionTemplateId(e.target.value)}
                       >
-                        {MR_RABBIT_CUSTOMER.scriptedRevisionTemplates.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.label}
-                          </option>
-                        ))}
+                        {MR_RABBIT_CUSTOMER.scriptedRevisionTemplates.map(
+                          (t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.label}
+                            </option>
+                          )
+                        )}
                       </select>
 
                       <textarea
@@ -582,7 +664,9 @@ export function TeacherPanel({
                         className={modalStyles.textarea}
                         placeholder="Optional custom encouraging revision note..."
                         value={customRevisionMessage}
-                        onChange={(e) => setCustomRevisionMessage(e.target.value)}
+                        onChange={(e) =>
+                          setCustomRevisionMessage(e.target.value)
+                        }
                         data-testid="teacher-revision-custom-input"
                       />
 
@@ -604,12 +688,22 @@ export function TeacherPanel({
 
           {/* TAB 2: COMMISSIONS PREVIEW & EDITOR */}
           {activeTab === 'commissions' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+            >
               <div className={styles.splitGrid}>
                 {/* Commission List (including locked previews!) */}
                 <div className={styles.sectionBox}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 className={styles.sectionTitle}>All Commissions (Teacher Preview)</h3>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <h3 className={styles.sectionTitle}>
+                      All Commissions (Teacher Preview)
+                    </h3>
                     <button
                       type="button"
                       className={modalStyles.secondaryBtn}
@@ -634,21 +728,35 @@ export function TeacherPanel({
                             ? 'var(--accent-blueprint-soft)'
                             : 'var(--bg-surface)',
                           border: `1.5px solid ${
-                            isSelected ? 'var(--accent-blueprint)' : 'var(--border-warm)'
+                            isSelected
+                              ? 'var(--accent-blueprint)'
+                              : 'var(--border-warm)'
                           }`,
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '8px',
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                          }}
+                        >
                           <div>
                             <strong>
                               {c.order}. {c.title}
                             </strong>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            <div
+                              style={{
+                                fontSize: '0.78rem',
+                                color: 'var(--text-muted)',
+                              }}
+                            >
                               State: {p?.unlockState ?? 'locked'} &bull; Budget:{' '}
-                              {c.constructionBudget} &bull; Fee: {c.architectPayment}
+                              {c.constructionBudget} &bull; Fee:{' '}
+                              {c.architectPayment}
                             </div>
                           </div>
                           <button
@@ -661,12 +769,21 @@ export function TeacherPanel({
                           </button>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '6px',
+                            flexWrap: 'wrap',
+                          }}
+                        >
                           {p?.unlockState === 'locked' && (
                             <button
                               type="button"
                               className={modalStyles.secondaryBtn}
-                              style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                              style={{
+                                padding: '4px 10px',
+                                fontSize: '0.78rem',
+                              }}
                               onClick={() => onUnlockCommission(c.id, true)}
                               data-testid={`teacher-unlock-${c.order}`}
                             >
@@ -678,7 +795,10 @@ export function TeacherPanel({
                             <button
                               type="button"
                               className={modalStyles.secondaryBtn}
-                              style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                              style={{
+                                padding: '4px 10px',
+                                fontSize: '0.78rem',
+                              }}
                               onClick={() => onReopenCommission(c.id)}
                               data-testid={`teacher-reopen-${c.order}`}
                             >
@@ -691,7 +811,10 @@ export function TeacherPanel({
                               <button
                                 type="button"
                                 className={modalStyles.secondaryBtn}
-                                style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                                style={{
+                                  padding: '4px 10px',
+                                  fontSize: '0.78rem',
+                                }}
                                 onClick={() => onSwitchCommission(c.id)}
                               >
                                 Show in Studio
@@ -718,7 +841,9 @@ export function TeacherPanel({
                     />
                   </div>
                   <div className={modalStyles.fieldGroup}>
-                    <label className={modalStyles.fieldLabel}>Customer Dialogue</label>
+                    <label className={modalStyles.fieldLabel}>
+                      Customer Dialogue
+                    </label>
                     <textarea
                       rows={3}
                       className={modalStyles.textarea}
@@ -727,7 +852,9 @@ export function TeacherPanel({
                     />
                   </div>
                   <div className={modalStyles.fieldGroup}>
-                    <label className={modalStyles.fieldLabel}>Success Dialogue</label>
+                    <label className={modalStyles.fieldLabel}>
+                      Success Dialogue
+                    </label>
                     <textarea
                       rows={2}
                       className={modalStyles.textarea}
@@ -735,9 +862,17 @@ export function TeacherPanel({
                       onChange={(e) => setEditSuccessDialogue(e.target.value)}
                     />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '10px',
+                    }}
+                  >
                     <div className={modalStyles.fieldGroup}>
-                      <label className={modalStyles.fieldLabel}>Construction Budget</label>
+                      <label className={modalStyles.fieldLabel}>
+                        Construction Budget
+                      </label>
                       <input
                         type="number"
                         min="0"
@@ -747,7 +882,9 @@ export function TeacherPanel({
                       />
                     </div>
                     <div className={modalStyles.fieldGroup}>
-                      <label className={modalStyles.fieldLabel}>Architect Fee</label>
+                      <label className={modalStyles.fieldLabel}>
+                        Architect Fee
+                      </label>
                       <input
                         type="number"
                         min="0"
@@ -789,7 +926,13 @@ export function TeacherPanel({
                     <span>Save Commission Changes</span>
                   </button>
                   {saveMessage && (
-                    <span style={{ fontSize: '0.84rem', color: 'var(--accent-sage)', fontWeight: 600 }}>
+                    <span
+                      style={{
+                        fontSize: '0.84rem',
+                        color: 'var(--accent-sage)',
+                        fontWeight: 600,
+                      }}
+                    >
                       {saveMessage}
                     </span>
                   )}
@@ -798,7 +941,9 @@ export function TeacherPanel({
 
               {showCreateForm && (
                 <div className={styles.sectionBox}>
-                  <h3 className={styles.sectionTitle}>Create Additional Commission</h3>
+                  <h3 className={styles.sectionTitle}>
+                    Create Additional Commission
+                  </h3>
                   <div className={styles.splitGrid}>
                     <div className={modalStyles.fieldGroup}>
                       <label className={modalStyles.fieldLabel}>Title</label>
@@ -810,9 +955,17 @@ export function TeacherPanel({
                         onChange={(e) => setNewTitle(e.target.value)}
                       />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '10px',
+                      }}
+                    >
                       <div className={modalStyles.fieldGroup}>
-                        <label className={modalStyles.fieldLabel}>Budget (coins)</label>
+                        <label className={modalStyles.fieldLabel}>
+                          Budget (coins)
+                        </label>
                         <input
                           type="number"
                           className={modalStyles.textInput}
@@ -821,7 +974,9 @@ export function TeacherPanel({
                         />
                       </div>
                       <div className={modalStyles.fieldGroup}>
-                        <label className={modalStyles.fieldLabel}>Payment (coins)</label>
+                        <label className={modalStyles.fieldLabel}>
+                          Payment (coins)
+                        </label>
                         <input
                           type="number"
                           className={modalStyles.textInput}
@@ -832,7 +987,9 @@ export function TeacherPanel({
                     </div>
                   </div>
                   <div className={modalStyles.fieldGroup}>
-                    <label className={modalStyles.fieldLabel}>Customer Dialogue</label>
+                    <label className={modalStyles.fieldLabel}>
+                      Customer Dialogue
+                    </label>
                     <textarea
                       rows={2}
                       className={modalStyles.textarea}
@@ -841,7 +998,9 @@ export function TeacherPanel({
                     />
                   </div>
                   <div className={modalStyles.fieldGroup}>
-                    <label className={modalStyles.fieldLabel}>Requirements (one per line)</label>
+                    <label className={modalStyles.fieldLabel}>
+                      Requirements (one per line)
+                    </label>
                     <textarea
                       rows={3}
                       className={modalStyles.textarea}
@@ -850,7 +1009,9 @@ export function TeacherPanel({
                     />
                   </div>
                   <div className={modalStyles.fieldGroup}>
-                    <label className={modalStyles.fieldLabel}>Success Dialogue</label>
+                    <label className={modalStyles.fieldLabel}>
+                      Success Dialogue
+                    </label>
                     <input
                       type="text"
                       className={modalStyles.textInput}
@@ -864,7 +1025,9 @@ export function TeacherPanel({
                       className={modalStyles.primaryBtn}
                       onClick={() => {
                         onCreateCommission({
-                          title: newTitle || `Bonus Commission ${sortedCommissions.length + 1}`,
+                          title:
+                            newTitle ||
+                            `Bonus Commission ${sortedCommissions.length + 1}`,
                           customerDialogue:
                             newDialogue ||
                             'I have a brand new idea to expand my architectural home!',
@@ -875,8 +1038,14 @@ export function TeacherPanel({
                             .map((s) => s.trim())
                             .filter(Boolean),
                           dimensions: [],
-                          constructionBudget: Math.max(0, Number(newBudget) || 6000),
-                          architectPayment: Math.max(0, Number(newPayment) || 400),
+                          constructionBudget: Math.max(
+                            0,
+                            Number(newBudget) || 6000
+                          ),
+                          architectPayment: Math.max(
+                            0,
+                            Number(newPayment) || 400
+                          ),
                         });
                         setShowCreateForm(false);
                         setNewTitle('');
@@ -898,9 +1067,14 @@ export function TeacherPanel({
           {activeTab === 'wallet' && (
             <div className={styles.splitGrid}>
               <div className={styles.sectionBox}>
-                <h3 className={styles.sectionTitle}>Studio &amp; Wallet Controls</h3>
+                <h3 className={styles.sectionTitle}>
+                  Studio &amp; Wallet Controls
+                </h3>
                 <div className={modalStyles.fieldGroup}>
-                  <label htmlFor="studio-title-input" className={modalStyles.fieldLabel}>
+                  <label
+                    htmlFor="studio-title-input"
+                    className={modalStyles.fieldLabel}
+                  >
                     Configurable Studio Title
                   </label>
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -923,7 +1097,8 @@ export function TeacherPanel({
 
                 <div className={modalStyles.fieldGroup}>
                   <span className={modalStyles.fieldLabel}>
-                    Adjust Personal Wallet (Current: {state.wallet.balance.toLocaleString()} coins)
+                    Adjust Personal Wallet (Current:{' '}
+                    {state.wallet.balance.toLocaleString()} coins)
                   </span>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <input
@@ -964,15 +1139,26 @@ export function TeacherPanel({
                     </button>
                   </div>
                   {walletNotice && (
-                    <span className={modalStyles.fieldHint}>{walletNotice}</span>
+                    <span className={modalStyles.fieldHint}>
+                      {walletNotice}
+                    </span>
                   )}
                 </div>
 
                 <div>
-                  <div className={modalStyles.fieldLabel} style={{ marginBottom: '6px' }}>
+                  <div
+                    className={modalStyles.fieldLabel}
+                    style={{ marginBottom: '6px' }}
+                  >
                     All Achievements (Teacher View)
                   </div>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.85rem' }}>
+                  <ul
+                    style={{
+                      margin: 0,
+                      paddingLeft: '18px',
+                      fontSize: '0.85rem',
+                    }}
+                  >
                     {teacherAchievements.map((item) => (
                       <li key={item.definition.id}>
                         <strong>{item.definition.title}</strong> —{' '}
@@ -996,10 +1182,17 @@ export function TeacherPanel({
                     state.wallet.transactions.map((tx) => (
                       <div key={tx.id} className={styles.ledgerRow}>
                         <div>
-                          <div style={{ fontWeight: 600 }}>{tx.description}</div>
-                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                            {new Date(tx.timestamp).toLocaleString()} &bull; Balance:{' '}
-                            {tx.balanceAfter.toLocaleString()}
+                          <div style={{ fontWeight: 600 }}>
+                            {tx.description}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '0.74rem',
+                              color: 'var(--text-muted)',
+                            }}
+                          >
+                            {new Date(tx.timestamp).toLocaleString()} &bull;
+                            Balance: {tx.balanceAfter.toLocaleString()}
                           </div>
                         </div>
                         <span
@@ -1019,25 +1212,39 @@ export function TeacherPanel({
 
           {/* TAB 4: BACKUP, IMPORT & RESET */}
           {activeTab === 'backup' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+            >
               <div className={styles.splitGrid}>
                 <div className={styles.sectionBox}>
                   <h3 className={styles.sectionTitle}>Export Saved Progress</h3>
-                  <p style={{ fontSize: '0.87rem', color: 'var(--text-secondary)' }}>
+                  <p
+                    style={{
+                      fontSize: '0.87rem',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
                     Downloads a complete JSON backup of commissions, coins,
                     achievements, portfolio images, and workspace data.
                   </p>
                   <button
                     type="button"
                     className={modalStyles.primaryBtn}
-                    onClick={handleDownloadBackup}
+                    disabled={operationBusy}
+                    onClick={() => void perform(handleDownloadBackup)}
                     data-testid="teacher-export-backup-btn"
                   >
                     <Download size={16} />
                     <span>Download Studio Backup (.json)</span>
                   </button>
                   {backupNotice && (
-                    <span style={{ fontSize: '0.84rem', color: 'var(--accent-sage)', fontWeight: 600 }}>
+                    <span
+                      style={{
+                        fontSize: '0.84rem',
+                        color: 'var(--accent-sage)',
+                        fontWeight: 600,
+                      }}
+                    >
                       {backupNotice}
                     </span>
                   )}
@@ -1052,81 +1259,111 @@ export function TeacherPanel({
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        void handleBackupFileSelected(file);
+                        void perform(() => handleBackupFileSelected(file));
                       }
                     }}
                   />
                   {importPreview && !importPreview.valid && (
-                    <div style={{ color: 'var(--status-danger)', fontSize: '0.86rem', fontWeight: 600 }}>
+                    <div
+                      style={{
+                        color: 'var(--status-danger)',
+                        fontSize: '0.86rem',
+                        fontWeight: 600,
+                      }}
+                    >
                       {importPreview.error}
                     </div>
                   )}
-                  {importPreview?.valid && importPreview.summary && importPreview.backup && (
-                    <div
-                      style={{
-                        background: 'var(--bg-surface)',
-                        border: '1px solid var(--border-warm)',
-                        borderRadius: 'var(--radius-sm)',
-                        padding: '10px',
-                        fontSize: '0.84rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                      }}
-                    >
-                      <div>
-                        <strong>Studio:</strong> {importPreview.summary.studioTitle}
-                      </div>
-                      <div>
-                        <strong>Progress:</strong>{' '}
-                        {importPreview.summary.completedCommissions}/
-                        {importPreview.summary.totalCommissions} commissions &bull;{' '}
-                        {importPreview.summary.walletBalance} coins &bull;{' '}
-                        {importPreview.summary.rank}
-                      </div>
-                      {importPreview.summary.hasWorkspaceData && (
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <input
-                            type="checkbox"
-                            checked={importWorkspaceToggle}
-                            onChange={(e) =>
-                              setImportWorkspaceToggle(e.target.checked)
-                            }
-                          />
-                          <span>Also restore saved workspace data</span>
-                        </label>
-                      )}
-                      <button
-                        type="button"
-                        className={modalStyles.primaryBtn}
-                        onClick={async () => {
-                          if (!importPreview.backup) {
-                            return;
-                          }
-                          await onImportBackup(
-                            importPreview.backup,
-                            importWorkspaceToggle
-                          );
-                          setImportPreview(null);
-                          setBackupNotice('Studio progress restored from backup.');
+                  {importPreview?.valid &&
+                    importPreview.summary &&
+                    importPreview.backup && (
+                      <div
+                        style={{
+                          background: 'var(--bg-surface)',
+                          border: '1px solid var(--border-warm)',
+                          borderRadius: 'var(--radius-sm)',
+                          padding: '10px',
+                          fontSize: '0.84rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px',
                         }}
-                        data-testid="teacher-confirm-import-btn"
                       >
-                        <Upload size={15} />
-                        <span>Restore Backup Now</span>
-                      </button>
-                    </div>
-                  )}
+                        <div>
+                          <strong>Studio:</strong>{' '}
+                          {importPreview.summary.studioTitle}
+                        </div>
+                        <div>
+                          <strong>Progress:</strong>{' '}
+                          {importPreview.summary.completedCommissions}/
+                          {importPreview.summary.totalCommissions} commissions
+                          &bull; {importPreview.summary.walletBalance} coins
+                          &bull; {importPreview.summary.rank}
+                        </div>
+                        {importPreview.summary.hasWorkspaceData && (
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={importWorkspaceToggle}
+                              onChange={(e) =>
+                                setImportWorkspaceToggle(e.target.checked)
+                              }
+                            />
+                            <span>Also restore saved workspace data</span>
+                          </label>
+                        )}
+                        <button
+                          type="button"
+                          className={modalStyles.primaryBtn}
+                          disabled={operationBusy}
+                          onClick={() =>
+                            void perform(async () => {
+                              if (!importPreview.backup) {
+                                return;
+                              }
+                              await onImportBackup(
+                                importPreview.backup,
+                                importWorkspaceToggle
+                              );
+                              setImportPreview(null);
+                              setBackupNotice(
+                                'Studio progress restored from backup.'
+                              );
+                            })
+                          }
+                          data-testid="teacher-confirm-import-btn"
+                        >
+                          <Upload size={15} />
+                          <span>Restore Backup Now</span>
+                        </button>
+                      </div>
+                    )}
                 </div>
               </div>
 
               <div className={styles.dangerBox}>
                 <h3 className={styles.sectionTitle}>Reset Studio Progress</h3>
-                <p style={{ fontSize: '0.86rem', color: 'var(--text-primary)' }}>
-                  Resets Mr. Rabbit&apos;s campaign back to Commission 1, personal coins to
-                  0, and clears earned achievements and portfolio snapshots.
+                <p
+                  style={{ fontSize: '0.86rem', color: 'var(--text-primary)' }}
+                >
+                  Resets Mr. Rabbit&apos;s campaign back to Commission 1,
+                  personal coins to 0, and clears earned achievements and
+                  portfolio snapshots.
                 </p>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.85rem' }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                    fontSize: '0.85rem',
+                  }}
+                >
                   <input
                     type="checkbox"
                     checked={resetWorkspaceToo}
@@ -1134,7 +1371,14 @@ export function TeacherPanel({
                   />
                   <span>Also clear saved workspace storage</span>
                 </label>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '10px',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                  }}
+                >
                   <input
                     type="text"
                     placeholder="Type RESET to confirm"
@@ -1147,12 +1391,14 @@ export function TeacherPanel({
                   <button
                     type="button"
                     className={modalStyles.dangerBtn}
-                    disabled={resetPhrase.trim() !== 'RESET'}
-                    onClick={async () => {
-                      await onResetProgress(resetWorkspaceToo);
-                      setResetPhrase('');
-                      onClose();
-                    }}
+                    disabled={operationBusy || resetPhrase.trim() !== 'RESET'}
+                    onClick={() =>
+                      void perform(async () => {
+                        await onResetProgress(resetWorkspaceToo);
+                        setResetPhrase('');
+                        onClose();
+                      })
+                    }
                     data-testid="teacher-reset-confirm-btn"
                   >
                     <Trash2 size={15} />

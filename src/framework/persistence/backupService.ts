@@ -1,6 +1,8 @@
 import { getArchitectRank } from '../rewards/achievementService';
 import type { FrameworkState } from '../types';
 import { validateFrameworkState } from './schema';
+import { isSerializable } from '../utils/serializable';
+import { listPortfolioSnapshots } from '../portfolio/portfolioService';
 
 export const BACKUP_FORMAT_ID = 'himari-architecture-studio-backup';
 export const BACKUP_FORMAT_VERSION = 1;
@@ -53,7 +55,9 @@ export function serializeBackup(backup: StudioBackupFile): string {
   return JSON.stringify(backup, null, 2);
 }
 
-export function parseAndValidateBackup(jsonString: string): ParsedBackupPreview {
+export function parseAndValidateBackup(
+  jsonString: string
+): ParsedBackupPreview {
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonString);
@@ -80,7 +84,7 @@ export function parseAndValidateBackup(jsonString: string): ParsedBackupPreview 
   }
   if (
     typeof candidate.backupVersion !== 'number' ||
-    candidate.backupVersion > BACKUP_FORMAT_VERSION
+    candidate.backupVersion !== BACKUP_FORMAT_VERSION
   ) {
     return {
       valid: false,
@@ -119,6 +123,31 @@ export function parseAndValidateBackup(jsonString: string): ParsedBackupPreview 
       : undefined;
 
   const fw = candidate.frameworkState as FrameworkState;
+  const requiredImages = new Set([
+    ...Object.values(fw.submissions).map((s) => s.imageArtifactId),
+    ...listPortfolioSnapshots(fw.portfolio).map((p) => p.imageArtifactId),
+    ...(fw.activeCelebration ? [fw.activeCelebration.imageArtifactId] : []),
+  ]);
+  if (
+    [...requiredImages].some(
+      (id) =>
+        !/^data:image\/(png|jpeg|jpg|webp|svg\+xml|gif);(?:base64,|utf8,|charset=utf-8,)/i.test(
+          artifactsObj[id] ?? ''
+        )
+    )
+  ) {
+    return {
+      valid: false,
+      error:
+        'The backup is missing a required design image or contains an unsupported image artifact.',
+    };
+  }
+  if (
+    candidate.workspaceData !== undefined &&
+    (!workspaceData || !isSerializable(workspaceData))
+  ) {
+    return { valid: false, error: 'Invalid workspace data in backup.' };
+  }
   const completedCommissions = Object.values(fw.commissionProgress).filter(
     (p) => p.unlockState === 'completed'
   ).length;
