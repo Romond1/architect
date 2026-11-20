@@ -1,0 +1,67 @@
+:root {
+  /* Kid-friendly wide, rounded, crisp typography */
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Nunito', 'Plus Jakarta Sans', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Default Dark Theme: Twilight Aurora Atelier (cozy, pretty, high-contrast for kids) */
+  --bg-studio: #0f1526;
+  --bg-studio-backdrop:
+    radial-gradient(ellipse 68% 48% at 14% 10%, rgba(244, 151, 98, 0.22) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 52% at 86% 12%, rgba(92, 200, 224, 0.22) 0%, transparent 64%),
+    radial-gradient(ellipse 72% 45% at 52% 96%, rgba(132, 110, 219, 0.18) 0%, transparent 66%),
+    radial-gradient(2px 2px at 18% 26%, rgba(255, 244, 210, 0.65) 50%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 38% 18%, rgba(255, 244, 210, 0.5) 50%, transparent 100%),
+    radial-gradient(2px 2px at 74% 24%, rgba(168, 232, 255, 0.6) 50%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 90% 42%, rgba(255, 244, 210, 0.45) 50%, transparent 100%);
+  --bg-studio-elevated: #172038;
+  --bg-surface: #1b2540;
+  --bg-surface-muted: #222e4d;
+  --bg-blueprint: #122136;
+  --bg-blueprint-grid: rgba(127, 208, 247, 0.08);
+  --bg-blueprint-grid-major: rgba(248, 207, 100, 0.14);
+
+  --border-warm: #364770;
+  --border-strong: #4d6294;
+  --border-blueprint: #35587c;
+
+  --text-primary: #fbf8f1;
+  --text-secondary: #dfe8f7;
+  --text-muted: #b5c5df;
+  --text-on-accent: #131118;
+
+  --accent-terracotta: #f49762;
+  --accent-terracotta-hover: #ffa976;
+  --accent-terracotta-soft: rgba(244, 151, 98, 0.2);
+
+  --accent-blueprint: #7fd0f7;
+  --accent-blueprint-hover: #9edcf9;
+  --accent-blueprint-soft: rgba(127, 208, 247, 0.18);
+
+  --accent-sage: #74dfb0;
+  --accent-sage-soft: rgba(116, 223, 176, 0.18);
+
+  --accent-gold: #f8cf64;
+  --accent-gold-bright: #ffe08a;
+  --accent-gold-soft: rgba(248, 207, 100, 0.2);
+  --accent-gold-border: rgba(248, 207, 100, 0.55);
+
+  --status-warning: #ffbe5c;
+  --status-warning-soft: rgba(255, 190, 92, 0.18);
+  --status-danger: #ff8b82;
+  --status-danger-soft: rgba(255, 139, 130, 0.18);
+
+  --shadow-sm: 0 3px 10px rgba(4, 7, 16, 0.4);
+  --shadow-md: 0 12px 30px rgba(4, 7, 16, 0.48);
+  --shadow-lg: 0 24px 56px rgba(2, 4, 10, 0.68);
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+  --radius-pill: 9999px;
+
+  --header-height: 78px;
+  --transition-fast: 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-smooth: 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}

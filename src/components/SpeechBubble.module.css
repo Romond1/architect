@@ -1,0 +1,60 @@
+.bubble {
+  position: relative;
+  background: var(--bg-surface-muted);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.default {
+  border-color: var(--border-strong);
+}
+
+.revision {
+  background: var(--status-warning-soft);
+  border-color: rgba(255, 190, 92, 0.45);
+}
+
+.celebration {
+  background: var(--accent-sage-soft);
+  border-color: rgba(116, 223, 176, 0.45);
+}
+
+.tail {
+  position: absolute;
+  top: -8px;
+  left: 38px;
+  width: 14px;
+  height: 14px;
+  background: inherit;
+  border-top: 1.5px solid;
+  border-left: 1.5px solid;
+  border-color: inherit;
+  transform: rotate(45deg);
+}
+
+.speakerLabel {
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-gold);
+  margin-bottom: 6px;
+}
+
+.quote {
+  font-size: 1.12rem;
+  line-height: 1.62;
+  letter-spacing: 0.015em;
+  color: var(--text-primary);
+}
+
+.cursor {
+  display: inline-block;
+  width: 2.5px;
+  height: 1.05em;
+  background: var(--accent-terracotta);
+  margin-left: 3px;
+  vertical-align: text-bottom;
+}

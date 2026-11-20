@@ -1,0 +1,160 @@
+.emptyAtelier {
+  position: relative;
+  flex: 1;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(24px, 4vw, 52px);
+  overflow: auto;
+}
+
+.scenicSky {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.scenicSvg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.blueprintBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background-image:
+    linear-gradient(to right, var(--bg-blueprint-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--bg-blueprint-grid) 1px, transparent 1px),
+    linear-gradient(to right, var(--bg-blueprint-grid-major) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--bg-blueprint-grid-major) 1px, transparent 1px);
+  background-size:
+    28px 28px,
+    28px 28px,
+    140px 140px,
+    140px 140px;
+  pointer-events: none;
+}
+
+.centerCard {
+  position: relative;
+  z-index: 2;
+  width: min(680px, 100%);
+  background: var(--bg-surface);
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  border: 2px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  padding: clamp(28px, 4vw, 44px);
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.illustrationWrap {
+  width: 230px;
+  max-width: 100%;
+  margin-bottom: 4px;
+}
+
+.illustration {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.atelierBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--accent-blueprint-soft);
+  color: var(--accent-blueprint);
+  border: 1.5px solid var(--border-blueprint);
+}
+
+.headline {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 2.7vw, 2.3rem);
+  line-height: 1.25;
+  color: var(--text-primary);
+  max-width: 28ch;
+}
+
+.description {
+  font-size: 1.14rem;
+  line-height: 1.68;
+  letter-spacing: 0.014em;
+  color: var(--text-secondary);
+  max-width: 54ch;
+}
+
+.briefCard {
+  margin-top: 8px;
+  width: 100%;
+  text-align: left;
+  background: var(--bg-surface-muted);
+  border: 1.5px solid var(--border-warm);
+  border-radius: var(--radius-md);
+  padding: 18px 22px;
+}
+
+.briefHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.briefTag {
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-terracotta);
+}
+
+.briefBudget {
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: var(--accent-blueprint);
+  font-variant-numeric: tabular-nums;
+}
+
+.briefTitle {
+  font-family: var(--font-display);
+  font-size: 1.28rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.briefHint {
+  font-size: 1.02rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.briefHint code {
+  font-family: var(--font-mono);
+  font-size: 0.94rem;
+  background: var(--accent-blueprint-soft);
+  color: var(--accent-blueprint);
+  padding: 2px 8px;
+  border-radius: 6px;
+}

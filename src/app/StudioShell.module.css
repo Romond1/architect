@@ -1,0 +1,47 @@
+.appFrame {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-studio);
+  background-image: var(--bg-studio-backdrop);
+  background-attachment: fixed;
+  color: var(--text-primary);
+}
+
+.recoveryBanner {
+  background: var(--status-warning-soft);
+  border-bottom: 1.5px solid rgba(255, 190, 92, 0.42);
+  color: var(--text-primary);
+  padding: 12px 24px;
+  font-size: 0.98rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.recoveryClose {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.studioMain {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(410px, 465px) minmax(0, 1fr);
+  gap: 22px;
+  padding: 20px 24px 26px;
+  align-items: stretch;
+  min-height: calc(100vh - var(--header-height));
+}
+
+@media (max-width: 1120px) {
+  .studioMain {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+}

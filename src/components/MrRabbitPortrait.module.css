@@ -1,0 +1,66 @@
+.portraitFrame {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sm {
+  width: 72px;
+  height: 72px;
+}
+
+.md {
+  width: 126px;
+  height: 126px;
+}
+
+.lg {
+  width: 162px;
+  height: 162px;
+}
+
+.svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 6px 14px rgba(45, 38, 33, 0.1));
+}
+
+.earLeft,
+.earRight {
+  transform-box: fill-box;
+  transform-origin: bottom center;
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sparkles {
+  animation: gentleTwinkle 2.6s ease-in-out infinite;
+}
+
+.bounceCelebration {
+  animation: happyHop 1.5s ease-in-out infinite;
+}
+
+@keyframes gentleTwinkle {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes happyHop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  45% {
+    transform: translateY(-6px);
+  }
+}
