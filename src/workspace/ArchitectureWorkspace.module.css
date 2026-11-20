@@ -1,160 +1,512 @@
-.emptyAtelier {
-  position: relative;
+.editor {
+  --editor-line: var(--border-warm);
   flex: 1;
-  min-height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(24px, 4vw, 52px);
-  overflow: auto;
-}
-
-.scenicSky {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.scenicSvg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.blueprintBackdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background-image:
-    linear-gradient(to right, var(--bg-blueprint-grid) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--bg-blueprint-grid) 1px, transparent 1px),
-    linear-gradient(to right, var(--bg-blueprint-grid-major) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--bg-blueprint-grid-major) 1px, transparent 1px);
-  background-size:
-    28px 28px,
-    28px 28px,
-    140px 140px,
-    140px 140px;
-  pointer-events: none;
-}
-
-.centerCard {
-  position: relative;
-  z-index: 2;
-  width: min(680px, 100%);
-  background: var(--bg-surface);
-  background-image: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.04) 0%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  border: 2px solid var(--border-strong);
-  border-radius: var(--radius-xl);
-  padding: clamp(28px, 4vw, 44px);
-  box-shadow: var(--shadow-lg);
-  text-align: center;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 16px;
+  background: var(--bg-blueprint);
+  position: relative;
 }
-
-.illustrationWrap {
-  width: 230px;
-  max-width: 100%;
-  margin-bottom: 4px;
+.intro {
+  padding: 24px 26px 18px;
+  background: linear-gradient(
+    115deg,
+    var(--accent-blueprint-soft),
+    transparent 80%
+  );
 }
-
-.illustration {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.atelierBadge {
+.kicker {
   display: inline-flex;
   align-items: center;
-  padding: 6px 16px;
-  border-radius: var(--radius-pill);
-  font-size: 0.9rem;
+  gap: 9px;
+  font-size: 0.78rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  background: var(--accent-blueprint-soft);
+  letter-spacing: 0.075em;
   color: var(--accent-blueprint);
-  border: 1.5px solid var(--border-blueprint);
 }
-
-.headline {
+.intro h2 {
   font-family: var(--font-display);
-  font-size: clamp(1.75rem, 2.7vw, 2.3rem);
-  line-height: 1.25;
+  font-size: 1.75rem;
+  line-height: 1.3;
+  margin: 10px 0 7px;
   color: var(--text-primary);
-  max-width: 28ch;
 }
-
-.description {
-  font-size: 1.14rem;
-  line-height: 1.68;
-  letter-spacing: 0.014em;
+.intro p {
+  margin: 0;
+  font-size: 1rem;
   color: var(--text-secondary);
-  max-width: 54ch;
 }
-
-.briefCard {
-  margin-top: 8px;
+.form {
+  padding: 18px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--editor-line);
+  border-bottom: 1px solid var(--editor-line);
+}
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  font-weight: 800;
+  min-width: 0;
+}
+.form input {
+  box-sizing: border-box;
+  min-width: 0;
   width: 100%;
-  text-align: left;
-  background: var(--bg-surface-muted);
-  border: 1.5px solid var(--border-warm);
-  border-radius: var(--radius-md);
-  padding: 18px 22px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-studio-elevated);
+  color: var(--text-primary);
+  padding: 11px 14px;
+  font: 700 1.06rem var(--font-sans);
+  min-height: 46px;
 }
-
-.briefHeader {
+.form input:focus-visible {
+  outline: 3px solid var(--accent-blueprint);
+  outline-offset: 3px;
+}
+.titleField {
+  max-width: 100%;
+}
+.measureFields {
+  display: grid;
+  grid-template-columns: 1fr 18px 1fr 1fr;
+  align-items: end;
+  gap: 12px;
+}
+.inputUnit {
+  position: relative;
+  display: flex;
+}
+.inputUnit input {
+  padding-right: 38px;
+}
+.inputUnit > span {
+  position: absolute;
+  right: 13px;
+  top: 12px;
+  color: var(--text-muted);
+  pointer-events: none;
+  font-size: 0.9rem;
+}
+.times {
+  align-self: end;
+  padding-bottom: 10px;
+  text-align: center;
+  font-size: 1.3rem;
+  color: var(--text-muted);
+}
+.applyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+.applyRow p {
+  margin: 0;
+  max-width: 360px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.primary,
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  padding: 11px 16px;
+  min-height: 46px;
+  font: 800 0.95rem var(--font-sans);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.primary {
+  background: var(--accent-terracotta);
+  color: var(--text-on-accent);
+  border: 1.5px solid var(--accent-terracotta);
+}
+.primary:hover:not(:disabled) {
+  background: var(--accent-terracotta-hover);
+}
+.secondary {
+  background: var(--bg-surface-muted);
+  color: var(--text-primary);
+  border: 1.5px solid var(--border-strong);
+}
+.secondary:hover:not(:disabled) {
+  background: var(--bg-surface);
+  border-color: var(--accent-blueprint);
+}
+.editor button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+.editor button:focus-visible {
+  outline: 3px solid var(--accent-blueprint);
+  outline-offset: 3px;
+}
+.drawingToolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 12px 20px;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  background: var(--bg-studio-elevated);
+  border-bottom: 1px solid var(--editor-line);
 }
-
-.briefTag {
-  font-size: 0.9rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--accent-terracotta);
+.toolbarGroup {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
 }
-
-.briefBudget {
-  font-size: 0.94rem;
-  font-weight: 700;
+.drawingLabel {
+  font-size: 0.78rem;
   color: var(--accent-blueprint);
+  letter-spacing: 0.09em;
+  font-weight: 800;
+}
+.gridNote {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-left: 10px;
+}
+.toolbarGroup button {
+  min-width: 40px;
+  height: 40px;
+  padding: 7px 10px;
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-warm);
+  border-radius: 9px;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  cursor: pointer;
+  font: 800 0.9rem var(--font-sans);
+}
+.toolbarGroup output {
+  min-width: 55px;
+  font-size: 0.9rem;
+  text-align: center;
+  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
-
-.briefTitle {
-  font-family: var(--font-display);
-  font-size: 1.28rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 8px;
+.canvas {
+  min-height: 440px;
+  flex: 1;
+  position: relative;
+  background-color: #112139;
+  background-image:
+    linear-gradient(#29425b55 1px, transparent 1px),
+    linear-gradient(90deg, #29425b55 1px, transparent 1px);
+  background-size: 32px 32px;
 }
-
-.briefHint {
-  font-size: 1.02rem;
-  line-height: 1.6;
+.canvas > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  min-height: 440px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.canvas > svg:active {
+  cursor: grabbing;
+}
+.canvas > svg:focus-visible {
+  outline: 3px solid var(--accent-blueprint);
+  outline-offset: -5px;
+}
+.empty {
+  min-height: 440px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 35px;
+  text-align: center;
+  background: radial-gradient(
+    ellipse at 50% 35%,
+    var(--accent-blueprint-soft),
+    transparent 65%
+  );
+}
+.emptyMark {
+  width: 90px;
+  height: 90px;
+  display: grid;
+  place-items: center;
+  border-radius: 24px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--accent-gold);
+  transform: rotate(-6deg);
+}
+.empty h3 {
+  font: 700 clamp(1.4rem, 2.4vw, 1.9rem)/1.4 var(--font-display);
+  color: var(--text-primary);
+  margin: 0;
+}
+.empty p {
+  max-width: 390px;
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+.emptyNote {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+.panBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 20px;
+  border-top: 1px solid var(--editor-line);
+  border-bottom: 1px solid var(--editor-line);
+  background: var(--bg-studio-elevated);
+}
+.panBar > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+}
+.panBar .toolbarGroup button {
+  height: 34px;
+  min-width: 35px;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 20px 24px;
+  gap: 15px;
+  background: var(--bg-surface);
+}
+.stats > div {
+  min-width: 0;
+}
+.stats > div + div {
+  padding-left: 18px;
+  border-left: 1px solid var(--border-warm);
+}
+.stats span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.87rem;
+  margin-bottom: 7px;
+}
+.stats strong {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--accent-sage);
+  font-variant-numeric: tabular-nums;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 24px 18px;
+  background: var(--bg-surface);
+}
+.exportButtons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border-warm);
+  padding: 14px 24px;
+  background: var(--bg-studio-elevated);
+}
+.saved,
+.unsaved {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.unsaved {
+  color: var(--status-warning);
+}
+.saveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-sage);
+}
+.unsaved .saveDot {
+  background: var(--status-warning);
+}
+.reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: 700 0.85rem var(--font-sans);
+  padding: 8px 0;
+}
+.error,
+.pending {
+  margin: 0;
+  padding: 14px 24px;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+.error {
+  background: var(--status-danger-soft);
+  color: var(--text-primary);
+  border-top: 1px solid var(--status-danger);
+}
+.error button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-top: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.pending {
+  background: var(--status-warning-soft);
+  color: var(--status-warning);
+  font-weight: 700;
+}
+.resetConfirm {
+  margin: 16px 24px;
+  padding: 20px;
+  border: 1.5px solid var(--status-warning);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-muted);
+}
+.resetConfirm strong {
+  color: var(--text-primary);
+}
+.resetConfirm p {
+  font-size: 0.95rem;
+  line-height: 1.7;
   color: var(--text-secondary);
 }
-
-.briefHint code {
-  font-family: var(--font-mono);
-  font-size: 0.94rem;
-  background: var(--accent-blueprint-soft);
-  color: var(--accent-blueprint);
-  padding: 2px 8px;
-  border-radius: 6px;
+.resetConfirm > div {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.exportSource {
+  position: fixed;
+  left: -100000px;
+  top: 0;
+  width: 1600px;
+  height: 1200px;
+  overflow: hidden;
+  pointer-events: none;
+}
+@media (max-width: 760px) {
+  .intro {
+    padding: 20px;
+  }
+  .intro h2 {
+    font-size: 1.55rem;
+  }
+  .form {
+    padding: 18px;
+  }
+  .measureFields {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .measureFields > label:last-child {
+    grid-column: 1/-1;
+  }
+  .times {
+    display: none;
+  }
+  .applyRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .applyRow p {
+    max-width: none;
+  }
+  .drawingToolbar {
+    padding: 12px 15px;
+  }
+  .gridNote {
+    display: none;
+  }
+  .canvas,
+  .canvas > svg,
+  .empty {
+    min-height: 380px;
+  }
+  .empty {
+    padding: 28px 20px;
+  }
+  .empty .kicker {
+    font-size: 0.7rem;
+  }
+  .panBar {
+    padding: 10px 15px;
+  }
+  .stats {
+    padding: 18px;
+    gap: 10px;
+  }
+  .stats > div + div {
+    padding-left: 10px;
+  }
+  .stats span {
+    font-size: 0.78rem;
+  }
+  .stats strong {
+    font-size: 1rem;
+  }
+  .actions {
+    padding: 8px 18px 18px;
+  }
+  .actions > button {
+    width: 100%;
+  }
+  .exportButtons {
+    width: 100%;
+  }
+  .exportButtons button {
+    flex: 1;
+  }
+  .footer {
+    padding: 12px 18px;
+  }
 }

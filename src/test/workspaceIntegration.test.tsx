@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { useEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StudioShell } from '../app/StudioShell';
@@ -13,7 +19,7 @@ describe('Architectural Workspace Boundary and Integration Contract', () => {
     localStorage.clear();
   });
 
-  it('renders only the empty studio state with zero architectural tool buttons', () => {
+  it('offers only the authorized first-generation room tools, with no room created', () => {
     const mockBridge: WorkspaceBridge = {
       context: {
         activeCommission: {
@@ -46,27 +52,20 @@ describe('Architectural Workspace Boundary and Integration Contract', () => {
     };
 
     const { container } = render(<ArchitectureWorkspace bridge={mockBridge} />);
-
     expect(
-      screen.getByText(
-        'Your architecture studio is ready. What will you build first?'
-      )
+      screen.getByRole('button', { name: 'Create room' })
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/You haven't created your architectural design tools yet/i)
-    ).toBeInTheDocument();
-
-    // Critical boundary: zero interactive tool buttons inside empty workspace
-    expect(container.querySelectorAll('button')).toHaveLength(0);
+    expect(screen.getByTestId('room-editor-empty')).toBeInTheDocument();
     expect(container.querySelectorAll('canvas')).toHaveLength(0);
-    expect(screen.queryByText(/add wall/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/draw room/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/3d view/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('room-north-wall')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/add door|add window|3d view|furniture/i)
+    ).not.toBeInTheDocument();
   });
 
   it('supports fullscreen toggle and Escape exit cleanly inside StudioShell', async () => {
     render(<StudioShell />);
-    expect(screen.getByTestId('architecture-workspace-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('room-editor-empty')).toBeInTheDocument();
     expect(screen.getByTestId('budget-total')).toHaveTextContent('1,000 coins');
     expect(screen.getByTestId('budget-reported')).toHaveTextContent(
       'Not reported yet'

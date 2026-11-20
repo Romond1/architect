@@ -1,235 +1,633 @@
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  Download,
+  Focus,
+  Hand,
+  Plus,
+  Ruler,
+  Send,
+  RotateCcw,
+  ZoomIn,
+  ZoomOut,
+  Check,
+  Save,
+} from 'lucide-react';
 import type { ArchitectureWorkspaceProps } from './integration';
+import {
+  cameraViewBox,
+  createProject,
+  createRoom,
+  formatMeasure,
+  INITIAL_CAMERA,
+  LIMITS,
+  measurements,
+  planBounds,
+  PROJECT_KEY,
+  validateProject,
+  type Camera,
+  type RoomProject,
+} from './roomModel';
+import { FloorPlanDrawing } from './FloorPlanDrawing';
+import { capturePlan, downloadPlan, serializePlan } from './planExport';
 import styles from './ArchitectureWorkspace.module.css';
 
-/**
- * Himari's Architectural Workspace Extension Point
- * ------------------------------------------------
- * This component intentionally starts completely empty of architectural tools.
- * During lessons with her teacher and Codex, Himari will progressively build
- * her own 2D drafting tools, wall/opening editors, cost calculators, 3D views,
- * materials, and furniture systems right here — using `bridge` to connect with
- * the customer studio framework.
- */
+function loadProject(bridge: ArchitectureWorkspaceProps['bridge']) {
+  try {
+    const saved = bridge.storage.load<unknown>(PROJECT_KEY);
+    return {
+      project: saved === null ? createProject() : validateProject(saved),
+      error: '',
+      blocked: false,
+    };
+  } catch (error) {
+    return {
+      project: createProject(),
+      error: `Your saved room was left untouched. ${(error as Error).message} Export a studio backup in Teacher controls before starting a new project.`,
+      blocked: true,
+    };
+  }
+}
+function formValues(project: RoomProject) {
+  const room = project.room ?? createRoom();
+  return {
+    width: String(room.widthM),
+    length: String(room.lengthM),
+    thickness: String(room.wallThicknessM),
+  };
+}
+
 export function ArchitectureWorkspace({ bridge }: ArchitectureWorkspaceProps) {
-  const { activeCommission } = bridge.context;
+  const [initial] = useState(() => loadProject(bridge));
+  const [project, setProject] = useState(initial.project),
+    [draft, setDraft] = useState(() => formValues(initial.project));
+  const [error, setError] = useState(initial.error),
+    [blocked, setBlocked] = useState(initial.blocked),
+    [saved, setSaved] = useState(true),
+    [busy, setBusy] = useState(false),
+    [confirmReset, setConfirmReset] = useState(false);
+  const [camera, setCamera] = useState<Camera>(INITIAL_CAMERA);
+  const svgRef = useRef<SVGSVGElement>(null),
+    exportRef = useRef<SVGSVGElement>(null),
+    projectRef = useRef(project);
+  const drag = useRef<{
+    inverse: DOMMatrix;
+    startX: number;
+    startY: number;
+    camera: Camera;
+    pointerId: number;
+  } | null>(null);
+  const exportBusy = useRef(false);
+  const id = useId().replace(/:/g, '');
+  projectRef.current = project;
+  const room = project.room,
+    bounds = room ? planBounds(room) : null;
+  const box = bounds ? cameraViewBox(bounds, camera) : null;
+  const stats = room ? measurements(room) : null;
+  const pending =
+    !!room &&
+    (Number(draft.width) !== room.widthM ||
+      Number(draft.length) !== room.lengthM ||
+      Number(draft.thickness) !== room.wallThicknessM);
+  const fit = () => setCamera({ ...INITIAL_CAMERA });
+  const zoom = (factor: number) =>
+    setCamera((previous) => ({
+      ...previous,
+      zoom: Math.min(8, Math.max(0.25, previous.zoom * factor)),
+    }));
+  const pan = (x: number, y: number) => {
+    if (box)
+      setCamera((previous) => ({
+        ...previous,
+        panX: previous.panX + x * box.width * 0.12,
+        panY: previous.panY + y * box.height * 0.12,
+      }));
+  };
+
+  function saveProject(next: RoomProject) {
+    setProject(next);
+    try {
+      bridge.storage.save(PROJECT_KEY, next);
+      setSaved(true);
+      setError('');
+    } catch (error) {
+      setSaved(false);
+      setError(
+        `Your room is still here, but it could not be saved. ${(error as Error).message}`
+      );
+    }
+  }
+  function applyRoom() {
+    if (blocked) return;
+    try {
+      const next = {
+        ...project,
+        room: createRoom(
+          Number(draft.width),
+          Number(draft.length),
+          Number(draft.thickness)
+        ),
+      };
+      saveProject(next);
+      fit();
+    } catch (error) {
+      setError((error as Error).message);
+    }
+  }
+  function reset() {
+    const next = createProject();
+    try {
+      bridge.storage.save(PROJECT_KEY, next);
+      setProject(next);
+      setDraft(formValues(next));
+      setBlocked(false);
+      setError('');
+      setSaved(true);
+      setConfirmReset(false);
+      fit();
+    } catch (error) {
+      setError(`The project was not reset. ${(error as Error).message}`);
+    }
+  }
+  useEffect(() => {
+    bridge.reportStatus({
+      projectName: room ? project.title.trim() || 'Room study' : null,
+      estimatedCost: null,
+      itemizedCosts: [],
+      hasDeliverable: !!room,
+      statusNote: room ? '2D room plan' : 'Ready to create a room',
+    });
+  }, [bridge, project, room]);
+  useEffect(() => {
+    bridge.registerSnapshotProvider(() =>
+      projectRef.current.room && exportRef.current
+        ? capturePlan(exportRef.current)
+        : null
+    );
+    bridge.registerProjectDataProvider(() =>
+      validateProject(projectRef.current)
+    );
+    return () => {
+      bridge.registerSnapshotProvider(null);
+      bridge.registerProjectDataProvider(null);
+    };
+  }, [bridge]);
+
+  async function exportImage() {
+    if (!exportRef.current || exportBusy.current) return;
+    exportBusy.current = true;
+    setBusy(true);
+    try {
+      const image = await capturePlan(exportRef.current);
+      downloadPlan('room-floor-plan.png', image.dataUrl);
+    } catch (error) {
+      setError((error as Error).message);
+    } finally {
+      setBusy(false);
+      exportBusy.current = false;
+    }
+  }
+  function pointerDown(e: ReactPointerEvent<SVGSVGElement>) {
+    if (e.button !== 0 && e.button !== 1) return;
+    const inverse = e.currentTarget.getScreenCTM()?.inverse();
+    if (!inverse) return;
+    const start = new DOMPoint(e.clientX, e.clientY).matrixTransform(inverse);
+    drag.current = {
+      inverse,
+      startX: start.x,
+      startY: start.y,
+      camera: { ...camera },
+      pointerId: e.pointerId,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+  function pointerMove(e: ReactPointerEvent<SVGSVGElement>) {
+    const start = drag.current;
+    if (!start || start.pointerId !== e.pointerId) return;
+    const current = new DOMPoint(e.clientX, e.clientY).matrixTransform(
+      start.inverse
+    );
+    setCamera({
+      ...start.camera,
+      panX: start.camera.panX - (current.x - start.startX),
+      panY: start.camera.panY - (current.y - start.startY),
+    });
+  }
+  const endDrag = () => {
+    drag.current = null;
+  };
 
   return (
-    <div className={styles.emptyAtelier} data-testid="architecture-workspace-empty">
-      {/* Purely decorative twilight starry-meadow background + soft grid wash */}
-      <div className={styles.scenicSky} aria-hidden="true">
-        <svg
-          viewBox="0 0 1200 760"
-          preserveAspectRatio="xMidYMid slice"
-          className={styles.scenicSvg}
-          role="presentation"
-        >
-          <defs>
-            <radialGradient id="wsMoonGlow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#ffe89e" stopOpacity="0.45" />
-              <stop offset="45%" stopColor="#f8cf64" stopOpacity="0.16" />
-              <stop offset="100%" stopColor="#f8cf64" stopOpacity="0" />
-            </radialGradient>
-            <linearGradient id="wsAurora" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#7fd0f7" stopOpacity="0.16" />
-              <stop offset="50%" stopColor="#b594ff" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="#74dfb0" stopOpacity="0.14" />
-            </linearGradient>
-            <linearGradient id="wsHillBack" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#1b2b4a" stopOpacity="0.72" />
-              <stop offset="100%" stopColor="#111b33" stopOpacity="0.92" />
-            </linearGradient>
-            <linearGradient id="wsHillFront" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#17243f" stopOpacity="0.88" />
-              <stop offset="100%" stopColor="#0d1527" stopOpacity="0.98" />
-            </linearGradient>
-          </defs>
-
-          {/* Soft aurora ribbon */}
-          <path
-            d="M-60 220 Q280 90 610 185 T1260 130 L1260 360 Q880 280 560 340 T-60 310 Z"
-            fill="url(#wsAurora)"
-          />
-
-          {/* Glowing crescent moon */}
-          <circle cx="1010" cy="130" r="118" fill="url(#wsMoonGlow)" />
-          <path
-            d="M1018 82 A44 44 0 1 0 1052 152 A36 36 0 1 1 1018 82 Z"
-            fill="#ffe599"
-            opacity="0.92"
-          />
-
-          {/* Twinkling stars & gentle sparkles */}
-          <g fill="#fff5cc" opacity="0.85">
-            <circle cx="135" cy="96" r="2.2" />
-            <circle cx="240" cy="160" r="1.8" />
-            <circle cx="370" cy="82" r="2.5" />
-            <circle cx="490" cy="145" r="1.6" />
-            <circle cx="670" cy="76" r="2.1" />
-            <circle cx="790" cy="168" r="1.9" />
-            <circle cx="885" cy="88" r="2.3" />
-            <circle cx="1115" cy="215" r="2" />
-            <path d="M196 116 L199 107 L202 116 L211 119 L202 122 L199 131 L196 122 L187 119 Z" opacity="0.78" />
-            <path d="M740 118 L742.5 111 L745 118 L752 120.5 L745 123 L742.5 130 L740 123 L733 120.5 Z" opacity="0.72" />
-          </g>
-
-          {/* Rolling evening hills */}
-          <path
-            d="M0 610 Q280 520 580 585 T1200 545 L1200 760 L0 760 Z"
-            fill="url(#wsHillBack)"
-          />
-          <path
-            d="M0 655 Q340 590 710 645 T1200 620 L1200 760 L0 760 Z"
-            fill="url(#wsHillFront)"
-          />
-
-          {/* Tiny warm meadow fireflies */}
-          <g fill="#ffd972" opacity="0.7">
-            <circle cx="165" cy="610" r="3" />
-            <circle cx="295" cy="645" r="2.5" />
-            <circle cx="940" cy="618" r="3" />
-            <circle cx="1075" cy="650" r="2.4" />
-          </g>
-        </svg>
+    <section
+      className={styles.editor}
+      data-testid="room-editor"
+      aria-label="Single room floor plan editor"
+    >
+      <div className={styles.intro}>
+        <span className={styles.kicker}>
+          <Ruler size={17} /> YOUR FIRST DRAWING TOOLS
+        </span>
+        <h2>A little room. Your own design.</h2>
+        <p>Choose your measurements, then see your idea take shape.</p>
       </div>
-
-      <div className={styles.blueprintBackdrop} aria-hidden="true" />
-
-      <div className={styles.centerCard}>
-        <div className={styles.illustrationWrap} aria-hidden="true">
-          <svg
-            viewBox="0 0 220 150"
-            className={styles.illustration}
-            role="presentation"
-          >
-            {/* Glowing dark blueprint sheet */}
-            <rect
-              x="24"
-              y="22"
-              width="158"
-              height="104"
-              rx="12"
-              fill="var(--bg-surface-muted)"
-              stroke="var(--border-strong)"
-              strokeWidth="2.2"
-            />
-            <rect
-              x="34"
-              y="32"
-              width="138"
-              height="84"
-              rx="6"
-              fill="var(--bg-blueprint)"
-              stroke="var(--border-blueprint)"
-              strokeWidth="1.6"
-              strokeDasharray="4 4"
-            />
-            {/* Decorative non-functional blueprint guidelines */}
-            <line
-              x1="54"
-              y1="74"
-              x2="152"
-              y2="74"
-              stroke="var(--accent-blueprint)"
-              strokeOpacity="0.45"
-              strokeWidth="1.6"
-            />
-            <line
-              x1="103"
-              y1="44"
-              x2="103"
-              y2="104"
-              stroke="var(--accent-blueprint)"
-              strokeOpacity="0.45"
-              strokeWidth="1.6"
-            />
-            <circle
-              cx="103"
-              cy="74"
-              r="22"
-              fill="none"
-              stroke="var(--accent-terracotta)"
-              strokeOpacity="0.55"
-              strokeWidth="1.8"
-              strokeDasharray="3 3"
-            />
-            {/* Bright brass drafting compass */}
-            <g transform="translate(128, 16) rotate(14)">
-              <circle cx="18" cy="10" r="6" fill="var(--accent-gold)" />
-              <rect x="16" y="1" width="4" height="6" rx="1.5" fill="var(--accent-blueprint)" />
-              <line
-                x1="16"
-                y1="14"
-                x2="4"
-                y2="68"
-                stroke="var(--accent-blueprint)"
-                strokeWidth="4.2"
-                strokeLinecap="round"
-              />
-              <line
-                x1="20"
-                y1="14"
-                x2="34"
-                y2="68"
-                stroke="var(--accent-blueprint)"
-                strokeWidth="4.2"
-                strokeLinecap="round"
-              />
-              <path
-                d="M9 40 Q19 45 29 40"
-                fill="none"
-                stroke="var(--accent-gold)"
-                strokeWidth="2.8"
-              />
-              <circle cx="34" cy="69" r="2.4" fill="var(--accent-terracotta)" />
-            </g>
-            {/* Resting golden drafting pencil */}
-            <g transform="translate(38, 114) rotate(-9)">
-              <rect
-                x="0"
-                y="0"
-                width="84"
-                height="8.5"
-                rx="2.5"
-                fill="var(--accent-gold-bright)"
-                stroke="#221f28"
-                strokeWidth="1.2"
-              />
-              <polygon points="84,0 96,4.25 84,8.5" fill="#f7dec0" stroke="#221f28" strokeWidth="1" />
-              <polygon points="91,2.6 96,4.25 91,5.9" fill="#1e2a43" />
-            </g>
-          </svg>
+      {error && (
+        <div className={styles.error} role="alert">
+          {error}
+          {!saved && !blocked && (
+            <button type="button" onClick={() => saveProject(project)}>
+              <Save size={16} />
+              Try saving again
+            </button>
+          )}
         </div>
-
-        <span className={styles.atelierBadge}>Blank Drafting Table</span>
-
-        <h2 className={styles.headline}>
-          Your architecture studio is ready. What will you build first?
-        </h2>
-
-        <p className={styles.description}>
-          You haven&apos;t created your architectural design tools yet. Work with your
-          teacher to develop the tools you need to fulfil your customer&apos;s
-          request.
-        </p>
-
-        <div className={styles.briefCard}>
-          <div className={styles.briefHeader}>
-            <span className={styles.briefTag}>
-              Current Request &bull; Commission {activeCommission.order}
+      )}
+      <form
+        className={styles.form}
+        data-testid="room-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          applyRoom();
+        }}
+      >
+        <label className={styles.titleField}>
+          Project name
+          <input
+            aria-label="Room project name"
+            maxLength={80}
+            value={project.title}
+            disabled={blocked}
+            onChange={(e) => saveProject({ ...project, title: e.target.value })}
+          />
+        </label>
+        <div className={styles.measureFields}>
+          <label>
+            Inside width
+            <span className={styles.inputUnit}>
+              <input
+                aria-label="Room width (m)"
+                type="number"
+                min={LIMITS.dimensionMin}
+                max={LIMITS.dimensionMax}
+                step="0.01"
+                required
+                value={draft.width}
+                disabled={blocked}
+                onChange={(e) => setDraft({ ...draft, width: e.target.value })}
+              />
+              <span>m</span>
             </span>
-            <span className={styles.briefBudget}>
-              Customer Budget: {activeCommission.constructionBudget.toLocaleString()} coins
+          </label>
+          <span className={styles.times} aria-hidden="true">
+            ×
+          </span>
+          <label>
+            Inside length
+            <span className={styles.inputUnit}>
+              <input
+                aria-label="Room length (m)"
+                type="number"
+                min={LIMITS.dimensionMin}
+                max={LIMITS.dimensionMax}
+                step="0.01"
+                required
+                value={draft.length}
+                disabled={blocked}
+                onChange={(e) => setDraft({ ...draft, length: e.target.value })}
+              />
+              <span>m</span>
+            </span>
+          </label>
+          <label>
+            Wall thickness
+            <span className={styles.inputUnit}>
+              <input
+                aria-label="Wall thickness (m)"
+                type="number"
+                min={LIMITS.thicknessMin}
+                max={LIMITS.thicknessMax}
+                step="0.01"
+                required
+                value={draft.thickness}
+                disabled={blocked}
+                onChange={(e) =>
+                  setDraft({ ...draft, thickness: e.target.value })
+                }
+              />
+              <span>m</span>
+            </span>
+          </label>
+        </div>
+        <div className={styles.applyRow}>
+          <p>
+            Width and length measure the space <strong>inside</strong> the
+            walls.
+          </p>
+          <button type="submit" className={styles.primary} disabled={blocked}>
+            {room ? (
+              <>
+                <Check size={18} />
+                Apply dimensions
+              </>
+            ) : (
+              <>
+                <Plus size={18} />
+                Create room
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+      {pending && (
+        <p className={styles.pending} role="status">
+          Your measurements have changed. Apply dimensions to update the
+          drawing.
+        </p>
+      )}
+      <div className={styles.drawingToolbar}>
+        <div className={styles.toolbarGroup}>
+          <span className={styles.drawingLabel}>FLOOR PLAN</span>
+          <span className={styles.gridNote}>0.5 m drafting grid</span>
+        </div>
+        <div className={styles.toolbarGroup}>
+          <button
+            aria-label="Zoom out"
+            title="Zoom out"
+            disabled={!room || camera.zoom <= 0.25}
+            onClick={() => zoom(1 / 1.25)}
+          >
+            <ZoomOut size={19} />
+          </button>
+          <output aria-label="Drawing zoom">
+            {Math.round(camera.zoom * 100)}%
+          </output>
+          <button
+            aria-label="Zoom in"
+            title="Zoom in"
+            disabled={!room || camera.zoom >= 8}
+            onClick={() => zoom(1.25)}
+          >
+            <ZoomIn size={19} />
+          </button>
+          <button
+            aria-label="Fit to view"
+            title="Fit to view"
+            disabled={!room}
+            onClick={fit}
+          >
+            <Focus size={18} />
+            <span>Fit</span>
+          </button>
+        </div>
+      </div>
+      <div className={styles.canvas}>
+        {room && box ? (
+          <svg
+            ref={svgRef}
+            data-testid="floor-plan"
+            role="img"
+            aria-label="Rectangular room floor plan with inside dimensions"
+            viewBox={`${box.x} ${box.y} ${box.width} ${box.height}`}
+            preserveAspectRatio="xMidYMid meet"
+            onPointerDown={pointerDown}
+            onPointerMove={pointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            onLostPointerCapture={endDrag}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft') {
+                pan(-1, 0);
+                e.preventDefault();
+              }
+              if (e.key === 'ArrowRight') {
+                pan(1, 0);
+                e.preventDefault();
+              }
+              if (e.key === 'ArrowUp') {
+                pan(0, -1);
+                e.preventDefault();
+              }
+              if (e.key === 'ArrowDown') {
+                pan(0, 1);
+                e.preventDefault();
+              }
+              if (e.key === '+' || e.key === '=') {
+                zoom(1.25);
+                e.preventDefault();
+              }
+              if (e.key === '-') {
+                zoom(0.8);
+                e.preventDefault();
+              }
+              if (e.key === '0') {
+                fit();
+                e.preventDefault();
+              }
+            }}
+          >
+            <title>{project.title || 'Room study'}</title>
+            <desc>
+              One room, {formatMeasure(room.widthM)} metres wide and{' '}
+              {formatMeasure(room.lengthM)} metres long. Four walls,{' '}
+              {formatMeasure(room.wallThicknessM)} metres thick. Drag to pan,
+              use the zoom controls or arrow keys, and press zero to fit.
+            </desc>
+            <FloorPlanDrawing
+              project={project}
+              box={box}
+              prefix={`${id}-live`}
+            />
+          </svg>
+        ) : (
+          <div className={styles.empty} data-testid="room-editor-empty">
+            <div className={styles.emptyMark}>
+              <Ruler size={42} strokeWidth={1.4} />
+            </div>
+            <span className={styles.kicker}>
+              A BLANK PAGE. A NEW POSSIBILITY.
+            </span>
+            <h3>Let’s make your first room.</h3>
+            <p>
+              Read Mr. Rabbit’s brief, choose a width and length, then select{' '}
+              <strong>Create room</strong>.
+            </p>
+            <span className={styles.emptyNote}>
+              You’re the architect. The measurements are up to you.
             </span>
           </div>
-          <div className={styles.briefTitle}>{activeCommission.title}</div>
-          <p className={styles.briefHint}>
-            Study {activeCommission.customerName}&apos;s{' '}
-            {activeCommission.requirements.length} requirements on the left, decide
-            what software tools to build first, and craft your studio right inside{' '}
-            <code>src/workspace/</code>.
-          </p>
+        )}
+      </div>
+      <div className={styles.panBar}>
+        <span>
+          <Hand size={16} />
+          Drag the plan to move around
+        </span>
+        <div className={styles.toolbarGroup} aria-label="Pan drawing">
+          <button
+            aria-label="Pan left"
+            disabled={!room}
+            onClick={() => pan(-1, 0)}
+          >
+            <ArrowLeft size={17} />
+          </button>
+          <button
+            aria-label="Pan up"
+            disabled={!room}
+            onClick={() => pan(0, -1)}
+          >
+            <ArrowUp size={17} />
+          </button>
+          <button
+            aria-label="Pan down"
+            disabled={!room}
+            onClick={() => pan(0, 1)}
+          >
+            <ArrowDown size={17} />
+          </button>
+          <button
+            aria-label="Pan right"
+            disabled={!room}
+            onClick={() => pan(1, 0)}
+          >
+            <ArrowRight size={17} />
+          </button>
         </div>
       </div>
-    </div>
+      <div className={styles.stats} aria-live="polite">
+        <div>
+          <span>Floor area</span>
+          <strong data-testid="room-area">
+            {stats ? `${formatMeasure(stats.areaM2)} m²` : '—'}
+          </strong>
+        </div>
+        <div>
+          <span>Inside perimeter</span>
+          <strong data-testid="room-perimeter">
+            {stats ? `${formatMeasure(stats.perimeterM)} m` : '—'}
+          </strong>
+        </div>
+        <div>
+          <span>Outside size</span>
+          <strong>
+            {stats
+              ? `${formatMeasure(stats.outsideWidthM)} × ${formatMeasure(stats.outsideLengthM)} m`
+              : '—'}
+          </strong>
+        </div>
+      </div>
+      <div className={styles.actions}>
+        <div className={styles.exportButtons}>
+          <button
+            className={styles.secondary}
+            disabled={!room || busy || pending}
+            onClick={() => void exportImage()}
+          >
+            <Download size={18} />
+            {busy ? 'Preparing image…' : 'Export PNG'}
+          </button>
+          <button
+            className={styles.secondary}
+            disabled={!room || pending}
+            onClick={() => {
+              if (exportRef.current)
+                downloadPlan(
+                  'room-floor-plan.svg',
+                  serializePlan(exportRef.current),
+                  'image/svg+xml'
+                );
+            }}
+          >
+            Save SVG
+          </button>
+        </div>
+        <button
+          className={styles.primary}
+          disabled={!room || pending || busy}
+          onClick={() => bridge.requestDelivery()}
+        >
+          <Send size={17} />
+          Deliver this plan
+        </button>
+      </div>
+      <footer className={styles.footer}>
+        <span className={saved ? styles.saved : styles.unsaved}>
+          <span className={styles.saveDot} />
+          {room
+            ? saved
+              ? 'Room project saved on this computer'
+              : 'Changes are not saved yet'
+            : 'Ready for your first room'}
+        </span>
+        <button
+          className={styles.reset}
+          onClick={() => setConfirmReset(true)}
+          disabled={!room && !blocked}
+        >
+          <RotateCcw size={15} />
+          Reset project
+        </button>
+      </footer>
+      {confirmReset && (
+        <div
+          className={styles.resetConfirm}
+          role="group"
+          aria-label="Confirm room project reset"
+        >
+          <strong>Start a fresh room project?</strong>
+          <p>
+            This replaces this room project only. Your commissions, coins and
+            portfolio stay as they are.
+            {blocked
+              ? ' Export a studio backup first if you need to keep the unreadable project.'
+              : ''}
+          </p>
+          <div>
+            <button
+              className={styles.secondary}
+              onClick={() => setConfirmReset(false)}
+            >
+              Keep my room
+            </button>
+            <button className={styles.primary} onClick={reset}>
+              Start a new project
+            </button>
+          </div>
+        </div>
+      )}
+      {room && bounds && (
+        <div className={styles.exportSource} aria-hidden="true">
+          <svg
+            ref={exportRef}
+            xmlns="http://www.w3.org/2000/svg"
+            width="1600"
+            height="1200"
+            viewBox={`${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`}
+            preserveAspectRatio="xMidYMid meet"
+          >
+            <title>{project.title || 'Room study'}</title>
+            <desc>
+              Measured single-room floor plan. All dimensions are in metres.
+            </desc>
+            <FloorPlanDrawing
+              project={project}
+              box={bounds}
+              print
+              prefix={`${id}-export`}
+              testIds={false}
+            />
+          </svg>
+        </div>
+      )}
+    </section>
   );
 }

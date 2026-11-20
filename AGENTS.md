@@ -12,6 +12,10 @@ Read these rules carefully before making any changes.
 - **Do NOT anticipate future commissions.** Implement *only* the architectural tools or capabilities requested in the current lesson.
 - For example, if Himari asks for a 2D rectangular room drawing tool for Commission 1, build only that — do **not** prematurely add doors, windows, 3D rendering, materials, lighting, or furniture.
 
+## Authorized starting point
+
+The first lesson now starts with a functional, deliberately limited single-room 2D SVG editor. Preserve this implementation. It supports one rectangle, inside width/length, outward wall thickness, measurements, camera controls, PNG/SVG export and bridge delivery. Do not add later capabilities until Himari and her teacher request them. The neutral default is 3 × 3 m; never automatically solve the current brief. The initial project has no room and no completed commission.
+
 ## 2. Where Architectural Features Belong
 
 - Put all architectural tools, editors, renderers, geometry models, cost calculators, and asset libraries inside **`src/workspace/`**.

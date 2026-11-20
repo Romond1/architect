@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../app/App';
 
@@ -29,7 +35,7 @@ describe('End-to-End Studio UI Workflow (Commissions 1 to 5 + Shop + Portfolio +
       'data-expression',
       'greeting'
     );
-    expect(screen.getByTestId('architecture-workspace-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('room-editor-empty')).toBeInTheDocument();
 
     // Check sealed commissions 2-5 in roadmap
     fireEvent.click(screen.getByTestId('open-commissions-btn'));
@@ -39,7 +45,9 @@ describe('End-to-End Studio UI Workflow (Commissions 1 to 5 + Shop + Portfolio +
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
     // 2. Deliver Commission 1 -> Request Revision -> Redeliver -> Approve
-    fireEvent.click(screen.getByTestId('deliver-design-btn'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('deliver-design-btn'));
+    });
     const fileInput1 = screen.getByTestId('delivery-file-input');
     fireEvent.change(fileInput1, {
       target: { files: [createMockPngFile('room-v1.png')] },
@@ -92,7 +100,9 @@ describe('End-to-End Studio UI Workflow (Commissions 1 to 5 + Shop + Portfolio +
         commissionTitles[idx]
       );
 
-      fireEvent.click(screen.getByTestId('deliver-design-btn'));
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('deliver-design-btn'));
+      });
       const fileInput = screen.getByTestId('delivery-file-input');
       fireEvent.change(fileInput, {
         target: { files: [createMockPngFile(`commission-${idx + 1}.png`)] },
@@ -124,7 +134,9 @@ describe('End-to-End Studio UI Workflow (Commissions 1 to 5 + Shop + Portfolio +
       if (idx < 4) {
         fireEvent.click(screen.getByTestId('celebration-accept-next'));
       } else {
-        expect(celebration).toHaveTextContent('Master Architect & Studio Creator');
+        expect(celebration).toHaveTextContent(
+          'Master Architect & Studio Creator'
+        );
         fireEvent.click(screen.getByTestId('celebration-keep-exploring'));
       }
     }
@@ -154,7 +166,9 @@ describe('End-to-End Studio UI Workflow (Commissions 1 to 5 + Shop + Portfolio +
     expect(screen.getByTestId('portfolio-entry-1')).toBeInTheDocument();
     expect(screen.getByTestId('portfolio-entry-5')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('open-presentation-mode-btn'));
-    expect(screen.getByTestId('portfolio-presentation-modal')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('portfolio-presentation-modal')
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
     // 5. Simulate page reload and verify state persists
